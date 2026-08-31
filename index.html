@@ -1,0 +1,1751 @@
+<!-- SOUND TERRARIUM HTML v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
+  v116: adds TIME/DATE button for visible clock-overlay control. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SOUND TERRARIUM v120 — worldwide browser version</title>
+<style>
+body{margin:0;padding:16px;background:#111;color:#ddd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+h2{font-size:18px;margin:0 0 6px}
+p{font-size:12px;color:#aaa;line-height:1.55;max-width:760px}
+canvas{display:block;width:320px;height:240px;background:#000;border:1px solid #555;image-rendering:pixelated}
+.row{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+button{padding:7px 10px;background:#222;color:#fff;border:1px solid #666;border-radius:6px} input{padding:7px;background:#181818;color:#fff;border:1px solid #666;border-radius:6px}
+.meter{font:11px monospace;color:#aaa}
+.note{font-size:11px;color:#888;margin-top:7px;max-width:760px}
+</style>
+</head>
+<body>
+<h2>SOUND TERRARIUM</h2>
+<p><em>inspired by retro arcade</em><br>A tiny world where sound creates the terrain, while real-world time, weather, sunrise/sunset, and moonrise/moonset shape the sky.</p>
+<canvas id="c" width="320" height="240"></canvas>
+<div class="row">
+<button id="share">START MICROPHONE</button>
+<button id="infoToggle">INFORMATION</button>
+<button id="clockToggle">TIME/DATE</button>
+<button id="ufoTest">UFO</button>
+<span class="meter" id="m">audio: demo</span>
+</div>
+<div class="row"><input id="city" placeholder="City: New York, London, Tokyo"><button id="setCity">LOCATION SET</button><button id="useLocation">USE CURRENT LOCATION</button><span class="meter" id="locLabel">Tokyo, Japan</span><span class="meter" id="locStatus"></span></div>
+<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, clock, weather and TEMP/HUM, I = show/hide SUN/MOON rise/set and LOCATION.</div>
+
+<script>
+const S={"jump":[["......b...",".....www..",".....www..","....www...","wwwwowww..","...bww..ww","....ww....","....wwwwww",".wwwwb....","..........",".........."]],"run":[["......b...",".....www..",".....www..","....www...","..wwowww..",".wwbww..ww","....ww....","....www...",".wwwwbww..","......ww..","......ww.."],["......b...",".....www..",".....www..",".....ww...","....www...","...wwwww..","...wwwwbww",".....www..","....wwww..","...www....","....ww...."],["......b...",".....www..",".....www..",".....ww...","...wwwwbb.","..wwowwww.",".....ww...","....wwww..","...ww..ww.","..ww...ww.","..ww......"]],"fall":[["ww..b..ww.","wwowwwoww.","wwowwwoww.",".wwwwwww..","...ww.....","...ww.....","...wwww...","...wwbww..","...wwbww..","...wwbww..","...ww....."]],"climb":[["....ww....","....ww...o","....wwwwww",".o..www...",".wwwwww...","....www...","....www...","...wwbww..","...wwbwww.","...ww.....","..www....."],["....ww....","b...ww....","wwwwww....","...www..b.","...wwwwww.","...www....","...www....","..wwoww...",".wwwoww...",".....ww...",".....www.."]],"wave":[["....ww.w..","...wwwww..","...wwww...","....ww....","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww..w.","...wwww.w.","...wwww.w.","....ww.w..","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww....","...wwww...","...wwww...","....ww....","...wwwwwww","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."]],"trip":[["..........","..........","......b...",".....www..","....wwww..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."],["..........","..........","..........","......b...",".....www..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."]]};
+const c=document.getElementById("c"),g=c.getContext("2d");
+g.imageSmoothingEnabled=false;
+
+const SW=320, SH=240, N=1, laneH=240;
+function earthArc(x){
+  const u=(x-(SW-1)/2)/((SW-1)/2);
+  return -2 + 3*u*u;
+}
+
+const COLORS=["#39d6c8"];
+const EQ_Y_COLORS=[
+  "#142b5f", // deep navy: lowest band
+  "#165dab", // blue
+  "#1e9ed6", // cyan-blue
+  "#25b7a4", // turquoise
+  "#52b84a", // green
+  "#e3d64a", // yellow
+  "#f29a38", // orange
+  "#e44b3a"  // red: highest band
+];
+const LABELS=["PITCH"];
+const PX={w:"#fff",o:"#ff6500",b:"#168bd2"};
+
+let audioCtx=null, analyser=null, freq=null, sharedStream=null;
+let demoMode=true, tick=0, last=0;
+let terrainAccumulator=0;
+
+const histories=[new Array(SW+24).fill(168)];
+const bands=[0], smooth=[0], prevBands=[0], beatPulse=[0], bandCooldown=[0];
+const phases=[0], stepPulse=[0], runFrame=[0], lastStepTick=[-999];
+let globalBeat=0, runBeatBoost=0;
+let dominantHz=220, smoothHz=220, volumeLevel=0, smoothVolume=0;
+let visibleEqBands=new Array(8).fill(0.08);
+let audioDiagScale=0.0001;
+// HTML-only adaptive normalization: each band gets its own moving floor/ceiling.
+// The SAME normalized values drive both the visible EQ and the terrain.
+let bandFloor=new Array(8).fill(0.02);
+let bandCeil=new Array(8).fill(0.18);
+let adaptiveEqNorm=new Array(8).fill(0.20);
+let lastHourlyWaveKey="";
+
+const holes=[{x:250,w:14,nextDelay:420}];
+
+function worldAdvancePixels(){
+  return globalBeat>0.42 ? 2 : 1;
+}
+function updateHoles(){ /* holes removed in SOUND TERRARIUM */
+}
+
+function holeAhead(i,p){ return false; }
+function overHole(i,p){ return false; }
+
+const people=[{
+  x:132,y:157,state:"run",vy:0,waveT:0,climbT:0,climbPhase:"",climbStartX:0,climbTargetY:0,jumpT:0,jumpBaseY:0,
+  nextWave:Infinity,targetX:132
+}];
+
+function sprite(rows,x,y){
+  x=Math.round(x);y=Math.round(y);
+
+  // 1px black silhouette around the exact 10x11 sprite.
+  // This improves readability on every colored band without changing the source sprite itself.
+  const occupied=[];
+  for(let yy=0;yy<rows.length;yy++){
+    for(let xx=0;xx<rows[yy].length;xx++){
+      if(rows[yy][xx]!==".") occupied.push([xx,yy]);
+    }
+  }
+  g.fillStyle="#000";
+  for(const [xx,yy] of occupied){
+    for(let oy=-1;oy<=1;oy++){
+      for(let ox=-1;ox<=1;ox++){
+        if(ox===0&&oy===0) continue;
+        g.fillRect(x+xx+ox,y+yy+oy,1,1);
+      }
+    }
+  }
+
+  // Original sprite pixels.
+  for(let yy=0;yy<rows.length;yy++){
+    for(let xx=0;xx<rows[yy].length;xx++){
+      const c=rows[yy][xx];
+      if(c===".")continue;
+      g.fillStyle=c==="w"?"#fff":c==="o"?"#ff8c20":"#28a8ff";
+      g.fillRect(x+xx,y+yy,1,1);
+    }
+  }
+}
+
+function analyzeAudio(t){
+  if(analyser && !demoMode){
+    analyser.getByteFrequencyData(freq);
+    const sr=audioCtx.sampleRate, fftSize=analyser.fftSize;
+    let weightedHz=0, spectralMass=0, sum=0, ct=0;
+
+    for(let i=1;i<freq.length;i++){
+      const hz=i*sr/fftSize;
+      const v=freq[i]/255;
+      sum+=v*v; ct++;
+
+      // Spectral centroid over the useful SOUND TERRARIUM range.
+      // Instead of following only the strongest FFT bin, use the
+      // "center of gravity" of the audible spectrum.
+      if(hz>=80 && hz<=1800){
+        const mag=freq[i];
+        weightedHz += hz * mag;
+        spectralMass += mag;
+      }
+    }
+
+    if(spectralMass>0){
+      dominantHz=weightedHz/spectralMass;
+    }
+    volumeLevel=ct?Math.sqrt(sum/ct):0;
+
+    // Eight visible retro-EQ bands, logarithmically spaced from 80 to 1800 Hz.
+    const lo=80, hi=1800;
+    const sums=new Array(8).fill(0), counts=new Array(8).fill(0);
+    for(let i=1;i<freq.length;i++){
+      const hz=i*sr/fftSize;
+      if(hz<lo || hz>hi) continue;
+      let b=Math.floor(Math.log(hz/lo)/Math.log(hi/lo)*8);
+      b=Math.max(0,Math.min(7,b));
+      sums[b]+=freq[i]/255;
+      counts[b]++;
+    }
+    let diagFrameMax=0;
+    for(let b=0;b<8;b++){
+      const v=counts[b]?sums[b]/counts[b]:0;
+      // Cardputer v104: identical 0.28 smoothing for each diagnostic band.
+      visibleEqBands[b]+= (v-visibleEqBands[b])*0.28;
+      if(visibleEqBands[b]>diagFrameMax) diagFrameMax=visibleEqBands[b];
+    }
+    // Cardputer v104: fast attack, slow decay. Crucially this is NOT
+    // renormalized to the current frame every time.
+    audioDiagScale=Math.max(diagFrameMax,audioDiagScale*0.992);
+    if(audioDiagScale<0.0001) audioDiagScale=0.0001;
+  }else{
+    const u=t/1000;
+    dominantHz=220*Math.pow(2,0.65*Math.sin(u*0.75)+0.18*Math.sin(u*2.1));
+    volumeLevel=0.12+0.10*(0.5+0.5*Math.sin(u*3.2));
+    let diagFrameMax=0;
+    for(let b=0;b<8;b++){
+      const v=0.10+0.08*(0.5+0.5*Math.sin(u*(1.7+b*0.17)+b*0.82));
+      visibleEqBands[b]+=(v-visibleEqBands[b])*0.28;
+      if(visibleEqBands[b]>diagFrameMax) diagFrameMax=visibleEqBands[b];
+    }
+    audioDiagScale=Math.max(diagFrameMax,audioDiagScale*0.992);
+    if(audioDiagScale<0.0001) audioDiagScale=0.0001;
+  }
+}
+
+function hzToGround(hz){
+  const lo=80, hi=1800;
+  hz=Math.max(lo,Math.min(hi,hz));
+  const n=Math.log(hz/lo)/Math.log(hi/lo);
+  return 205 - n*125;
+}
+
+function updateAdaptiveEqNorm(){
+  for(let b=0;b<8;b++){
+    const v=visibleEqBands[b];
+
+    // Per-band ceiling: instant peak capture, slow decay.
+    if(v>bandCeil[b]) bandCeil[b]=v;
+    else bandCeil[b]=bandCeil[b]*0.995 + v*0.005;
+
+    // Per-band floor: drops relatively quickly in quiet passages,
+    // rises only very slowly so ordinary sustained energy does not become "zero".
+    if(v<bandFloor[b]) bandFloor[b]=bandFloor[b]*0.85 + v*0.15;
+    else bandFloor[b]=bandFloor[b]*0.998 + v*0.002;
+
+    // Avoid tiny ranges that would exaggerate noise.
+    if(bandCeil[b] < bandFloor[b] + 0.025){
+      bandCeil[b]=bandFloor[b]+0.025;
+    }
+
+    let n=(v-bandFloor[b])/(bandCeil[b]-bandFloor[b]);
+    n=Math.max(0,Math.min(1,n));
+
+    // Keep a small visible baseline and smooth the value.
+    const target=0.08+n*0.92;
+    adaptiveEqNorm[b] += (target-adaptiveEqNorm[b])*0.22;
+  }
+}
+
+function currentEqGeometry(){
+  // Direct proportional port of Cardputer v104:
+  // Cardputer v104 uses horizonY=122, minH=6, maxH=27.
+  // HTML keeps the same proportions at 320×240.
+  const barW=7, gap=2, count=8;
+  const right=SW-4;
+  const total=count*barW+(count-1)*gap;
+  const x0=right-total;
+  const horizonY=SH-23;
+  const minH=11;
+  const maxH=48;
+
+  const tops=new Array(count);
+  const centers=new Array(count);
+  for(let b=0;b<count;b++){
+    const n=Math.max(0,Math.min(1,adaptiveEqNorm[b]));
+    const bh=minH+Math.round(n*(maxH-minH));
+    tops[b]=horizonY-bh;
+    centers[b]=Math.round(x0+b*(barW+gap)+barW/2);
+  }
+  return {barW,gap,count,right,total,x0,horizonY,minH,maxH,tops,centers};
+}
+
+function updateTerrain(){
+  globalBeat*=0.88; runBeatBoost*=0.86;
+  smoothVolume+=(volumeLevel-smoothVolume)*0.18;
+
+  const rise=smoothVolume-prevBands[0];
+  prevBands[0]=smoothVolume;
+  if(bandCooldown[0]>0)bandCooldown[0]--;
+  if(rise>0.025 && smoothVolume>0.05 && bandCooldown[0]===0){
+    globalBeat=Math.min(1,0.45+rise*6);
+    runBeatBoost=Math.max(runBeatBoost,0.9);
+    stepPulse[0]=1;
+    bandCooldown[0]=5;
+  }
+  stepPulse[0]*=0.84;
+
+  const h=histories[0];
+  const eq=currentEqGeometry();
+
+  // Cardputer v104 active path:
+  // 1) existing world moves left one pixel
+  // 2) new road is born at the RIGHTMOST RED bar's exact visible top
+  // 3) red -> navy stations may only PUSH that road upward
+  h.shift();
+  h.push(eq.tops[7]);
+
+  const influenceRadius=5;
+  for(let b=7;b>=0;b--){
+    const targetY=eq.tops[b];
+    const cx=eq.centers[b];
+
+    for(let dx=-influenceRadius;dx<=influenceRadius;dx++){
+      const x=cx+dx;
+      if(x<0 || x>=SW) continue;
+
+      const oldY=h[x];
+      if(targetY>=oldY) continue; // never push downward / erase a hill
+
+      const d=Math.abs(dx)/influenceRadius;
+      const w=0.5*(1+Math.cos(d*Math.PI)); // 1 at center -> 0 at edges
+      h[x]=oldY+(targetY-oldY)*w;
+    }
+  }
+}
+
+function beatAdvance(){
+  // Terrain scroll is handled once in updateTerrain().
+  // Beat still accelerates the runner animation, but no longer double-scrolls the road.
+}
+
+function groundAt(i,x){
+  const h=histories[i];
+  const xi=Math.max(0,Math.min(h.length-1,Math.round(x)));
+  return h[xi];
+}
+
+let runnerLost=false;
+let runnerLostSide=0;       // -1 = left, +1 = right
+let runnerOffscreenSince=0;
+const RUNNER_RESCUE_DELAY_MS=5000;
+
+function watchPersonOffscreen(i,p){
+  // Only the main runner uses the 5-second UFO rescue.
+  // Other lanes, if ever enabled, keep their original wrap behavior.
+  if(i!==0){
+    if(p.x < -10) p.x=SW+1;
+    else if(p.x > SW+10) p.x=-1;
+    return;
+  }
+
+  if(runnerLost) return;
+
+  if(p.x < -10 || p.x > SW+10){
+    runnerLost=true;
+    runnerLostSide=(p.x<0)?-1:1;
+    runnerOffscreenSince=performance.now();
+    // Keep the runner fully outside the screen while waiting for rescue.
+    p.x=(runnerLostSide<0)?-14:SW+14;
+  }
+}
+
+function updatePerson(i){
+  const p=people[i];
+
+  // Once the main runner has disappeared, leave it off-screen until the
+  // five-second rescue timer hands control to the UFO.
+  if(i===0 && runnerLost){
+    if(!UFO.active && performance.now()-runnerOffscreenSince>=RUNNER_RESCUE_DELAY_MS){
+      startLostRunnerRescue();
+    }
+    return;
+  }
+
+  if(UFO.active && (p.state==="ufoWait" || p.state==="ufoLanded")) return;
+  const gx=groundAt(i,p.x+5);
+  const ahead=groundAt(i,p.x+9);
+  const step=ahead-gx;
+
+  if(p.state==="run"){
+    const stride=0.18 + stepPulse[i]*0.42;
+    if(p.x<p.targetX)p.x=Math.min(p.targetX,p.x+stride);
+    if(p.x>p.targetX)p.x=Math.max(p.targetX,p.x-0.10);
+    p.y=gx-11;
+
+    // Look a short distance ahead and classify the sound-generated terrain.
+    // Canvas Y decreases upward, so a lower Y value means the ground rises.
+    const y0=groundAt(i,p.x+5);
+    const y1=groundAt(i,p.x+9);
+    const y2=groundAt(i,p.x+14);
+    const y3=groundAt(i,p.x+20);
+
+    const rise1=y0-y1;       // immediate rise
+    const rise2=y0-y2;       // peak height ahead
+    const return3=y3-y0;     // near zero when terrain quickly returns
+
+    // A short pointed bump: rise quickly, then return close to the old level.
+    // Jump only on a real little "hump", not on every tiny audio ripple.
+    const smallBump =
+      rise1>2.2 &&
+      rise2>3.2 &&
+      Math.abs(return3)<3.2 &&
+      (y3-y2)>2.0;
+
+    if(smallBump){
+      p.state="jump";
+      p.jumpT=0;
+      p.jumpBaseY=y0-11;
+      return;
+    }
+
+    // Long/steep terrain changes keep the original climb/fall behavior.
+    const step=y1-y0;
+    if(step>5.2){
+      p.state="fall"; p.vy=0.25; return;
+    }
+    if(step<-4.8){
+      // v62a: no climbing. Stay in RUN and follow the terrain surface.
+      p.state="run";
+    }
+
+    const now=safeNow();
+    const hourlyKey=now.getFullYear()+"-"+now.getMonth()+"-"+now.getDate()+"-"+now.getHours();
+    if(now.getMinutes()===0 && hourlyKey!==lastHourlyWaveKey){
+      p.state="wave";
+      p.waveT=0;
+      p.waveGroundX=p.x;
+      lastHourlyWaveKey=hourlyKey;
+    }
+  }
+  else if(p.state==="jump"){
+    // Keep the existing runner position; the scrolling terrain supplies forward motion.
+    // Use the exact 10x11 JUMP sprite while tracing a small 6px arc.
+    const ground=groundAt(i,p.x+5);
+    const duration=24;
+    const u=Math.min(1,p.jumpT/duration);
+    const lift=Math.sin(Math.PI*u)*7;
+    p.y=ground-11-lift;
+    p.jumpT++;
+    if(p.jumpT>duration){
+      p.y=groundAt(i,p.x+5)-11;
+      p.jumpT=0;
+      p.state="run";
+    }
+  }
+  else if(p.state==="gapfall"){
+    p.vy=Math.min(2.2,p.vy+0.12);
+    p.y+=p.vy;
+
+    if(i<N-1){
+      const landing=groundAt(i+1,p.x+5);
+      if(p.y+11>=landing){
+        p.y=landing-11;
+        p.vy=0;
+        p.gapT=0;
+        p.state="gapland";
+      }
+    }else{
+      // Bottom course cannot fall any farther. Recover on the same course.
+      const landing=groundAt(i,p.x+5);
+      if(p.y+11>=landing+8){
+        p.y=landing-11;
+        p.vy=0;
+        p.state="run";
+      }
+    }
+  }
+  else if(p.state==="gapland"){
+    // Stay on the lower course for a short beat instead of teleporting.
+    // The character is carried with the world while recovering.
+    p.x -= worldAdvancePixels();
+    p.y=groundAt(i+1,p.x+5)-11;
+    p.gapT++;
+    if(p.gapT>16){
+      p.gapT=0;
+      p.climbT=0;
+      p.state="gapclimb";
+    }
+  }
+  else if(p.state==="gapclimb"){
+    // Climb at the same world position.
+    // Because the terrain keeps scrolling left, the climber must also be carried
+    // left with it instead of drifting diagonally up-right.
+    p.x -= worldAdvancePixels();
+
+    const target=groundAt(i,p.x+5)-11;
+    p.climbT++;
+    p.y += (target-p.y)*0.075;
+
+    if(p.climbT>58 || Math.abs(p.y-target)<0.7){
+      p.y=target;
+      p.state="run";
+    }
+  }
+  else if(p.state==="trip"){
+    p.x -= worldAdvancePixels();
+    p.tripT++;
+    const ground=groundAt(i,p.x+5);
+
+    // Anchor the visible bottom of the flat TRIP sprite directly on the ground.
+    // TRIP's lowest occupied row is row 7 (0-based), so ground-8 places it on the surface.
+    p.y = ground-8;
+
+    if(p.tripT > 38){
+      p.tripT=0;
+      p.y=groundAt(i,p.x+5)-11;
+      p.state="run";
+    }
+  }
+  else if(p.state==="wave"){
+    // Stand on the same moving piece of terrain while waving.
+    // The world scrolls left by 1px (2px on a strong beat), so move the
+    // screen position left by exactly the same amount. This prevents the
+    // waving sprite from "walking forward" across the course.
+    p.x -= worldAdvancePixels();
+    p.y=groundAt(i,p.x+5)-11;
+    p.waveT++;
+    if(p.waveT>54 || p.x<18){
+      p.state="run";
+    }
+  }
+  else if(p.state==="fall"){
+    p.vy=Math.min(2.0,p.vy+0.11);
+    p.y+=p.vy;
+    const below=groundAt(i,p.x+5);
+    if(p.y+11>=below){
+      p.y=below-11;
+      p.vy=0;
+      p.state="run";
+    }
+    // Never allow a person to leave its lane.
+    const laneBottom=i*laneH+29;
+    if(p.y+11>laneBottom){
+      p.y=groundAt(i,p.x+5)-11;
+      p.vy=0; p.state="run";
+    }
+  }
+  else if(p.state==="climb"){
+    p.climbT++;
+
+    if(p.climbPhase==="approach"){
+      // Move horizontally for about 5 px without changing height:
+      // visually this reads as "getting right up to the wall".
+      p.y = p.y;
+      p.x += 0.18;
+      if(p.x - p.climbStartX >= 5){
+        p.climbPhase="up";
+        p.climbT=0;
+      }
+    }else{
+      // While climbing vertically, stay attached to the same moving piece of terrain.
+      // The terrain scrolls left every frame, so the runner must drift left by
+      // exactly the same world-advance amount. Otherwise the runner appears to
+      // move forward along the slope while "climbing".
+      p.x -= worldAdvancePixels();
+
+      const dy = p.climbTargetY - p.y;
+      if(Math.abs(dy) <= 0.7){
+        p.y = p.climbTargetY;
+        p.climbPhase="";
+        p.state="run";
+      }else{
+        const stepY = Math.sign(dy) * Math.min(0.55, Math.abs(dy));
+        p.y += stepY;
+      }
+
+      // Safety exit if terrain target was pathological.
+      if(p.climbT > 90){
+        p.y = p.climbTargetY;
+        p.climbPhase="";
+        p.state="run";
+      }
+    }
+  }
+
+  watchPersonOffscreen(i,p);
+}
+
+
+
+
+// ---------------- UFO 8-hour shift-change event ----------------
+// Automatic schedule: 01:00 / 09:00 / 17:00.
+// The test button can trigger the complete sequence at any time.
+const UFO={
+  active:false,
+  phase:"idle",
+  x:-34,y:30,
+  targetX:0,
+  phaseT:0,
+  beam:0,          // beam opacity/intensity
+  beamProgress:0,  // 0..1, beam grows from UFO down to terrain
+  beamGroundY:0,
+  abductY:0,
+  lastScheduleKey:"",
+  outgoingVariant:0,
+  incomingVariant:1
+};
+
+function ufoScheduleKey(now){
+  const h=now.getHours();
+  if(![1,9,17].includes(h) || now.getMinutes()!==0) return "";
+  return `${now.getFullYear()}-${now.getMonth()+1}-${now.getDate()}-${h}`;
+}
+
+function startUfoShift(){
+  if(UFO.active) return;
+  const p=people[0];
+  UFO.active=true;
+  UFO.phase="enterLeft";
+  UFO.x=-34;
+  UFO.y=31;
+  UFO.targetX=p.x+5;
+  UFO.phaseT=0;
+  UFO.beam=0;
+  UFO.beamProgress=0;
+  UFO.beamGroundY=groundAt(0,p.x+5);
+  UFO.abductY=p.y;
+  UFO.outgoingVariant=(UFO.outgoingVariant+0)%3;
+  UFO.incomingVariant=(UFO.outgoingVariant+1)%3;
+  // Important: runner keeps running normally while the UFO approaches.
+}
+
+function startLostRunnerRescue(){
+  if(UFO.active || !runnerLost) return;
+
+  const p=people[0];
+  const lostSide=runnerLostSide;
+
+  UFO.active=true;
+  UFO.phase=(lostSide<0)?"returnLeft":"returnRight";
+  UFO.x=(lostSide<0)?-38:SW+38;
+  UFO.y=31;
+  UFO.targetX=132+5;
+  UFO.phaseT=0;
+  UFO.beam=0;
+  UFO.beamProgress=0;
+
+  // Keep the missing runner outside the frame until the delivery beam appears.
+  p.x=(lostSide<0)?-40:SW+40;
+  p.y=-30;
+
+  runnerLost=false;
+  runnerLostSide=0;
+}
+
+function updateUfo(){
+  const now=safeNow();
+  const key=ufoScheduleKey(now);
+  if(key && key!==UFO.lastScheduleKey){
+    UFO.lastScheduleKey=key;
+    startUfoShift();
+  }
+  if(!UFO.active) return;
+
+  const p=people[0];
+  UFO.phaseT++;
+
+  if(UFO.phase==="enterLeft"){
+    // Track the moving runner while approaching.
+    UFO.targetX=p.x+5;
+    UFO.x+=2.0;
+    if(UFO.x>=UFO.targetX){
+      UFO.x=UFO.targetX;
+      UFO.phase="hoverBeforeBeam";
+      UFO.phaseT=0;
+    }
+
+  }else if(UFO.phase==="hoverBeforeBeam"){
+    // A short pause overhead. Runner is STILL running.
+    UFO.x=p.x+5;
+    if(UFO.phaseT>10){
+      UFO.phase="beamGrow";
+      UFO.phaseT=0;
+      UFO.beam=0.15;
+      UFO.beamProgress=0;
+      UFO.beamGroundY=groundAt(0,p.x+5);
+    }
+
+  }else if(UFO.phase==="beamGrow"){
+    // Beam grows DOWNWARD from the saucer toward the current terrain.
+    UFO.x=p.x+5;
+    UFO.beam=Math.min(1,UFO.beam+0.05);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
+    UFO.beamGroundY=groundAt(0,p.x+5);
+
+    if(UFO.beamProgress>=1){
+      // Only NOW, when the light actually reaches the ground,
+      // does the runner react and raise arms.
+      p.state="ufoWait";
+      p.vy=0;
+      UFO.phase="beamContact";
+      UFO.phaseT=0;
+    }
+
+  }else if(UFO.phase==="beamContact"){
+    // Hold the fully illuminated pose briefly so the cause/effect reads clearly.
+    UFO.beam=1;
+    UFO.beamProgress=1;
+    UFO.beamGroundY=groundAt(0,p.x+5);
+    p.x=UFO.x-5;
+    p.y=UFO.beamGroundY-11;
+    if(UFO.phaseT>12){
+      UFO.phase="abduct";
+      UFO.phaseT=0;
+    }
+
+  }else if(UFO.phase==="abduct"){
+    UFO.beam=1;
+    UFO.beamProgress=1;
+    // Raised-arms/relaxed capture pose, lifted straight upward.
+    p.x=UFO.x-5;
+    p.y-=1.15;
+    if(p.y<UFO.y+8){
+      UFO.phase="exitRight";
+      UFO.phaseT=0;
+      UFO.beam=0;
+      UFO.beamProgress=0;
+    }
+
+  }else if(UFO.phase==="exitRight"){
+    UFO.x+=2.5;
+    p.x=UFO.x-5;
+    p.y=UFO.y+5;
+    if(UFO.x>SW+38){
+      UFO.phase="returnRight";
+      UFO.x=SW+38;
+      UFO.y=31;
+      UFO.phaseT=0;
+      p.x=SW+40;
+      p.y=-30;
+    }
+
+  }else if(UFO.phase==="returnRight"){
+    UFO.x-=2.2;
+    UFO.targetX=132+5;
+    if(UFO.x<=UFO.targetX){
+      UFO.x=UFO.targetX;
+      UFO.phase="dropBeamGrow";
+      UFO.phaseT=0;
+      UFO.beam=0.15;
+      UFO.beamProgress=0;
+    }
+
+  }else if(UFO.phase==="returnLeft"){
+    UFO.x+=2.2;
+    UFO.targetX=132+5;
+    if(UFO.x>=UFO.targetX){
+      UFO.x=UFO.targetX;
+      UFO.phase="dropBeamGrow";
+      UFO.phaseT=0;
+      UFO.beam=0.15;
+      UFO.beamProgress=0;
+    }
+
+  }else if(UFO.phase==="dropBeamGrow"){
+    // Delivery beam also grows down to the terrain first.
+    UFO.beam=Math.min(1,UFO.beam+0.05);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
+    UFO.beamGroundY=groundAt(0,UFO.x);
+    if(UFO.beamProgress>=1){
+      UFO.phase="drop";
+      UFO.phaseT=0;
+      p.state="ufoWait";
+      p.x=UFO.x-5;
+      p.y=UFO.y+8;
+    }
+
+  }else if(UFO.phase==="drop"){
+    UFO.beam=1;
+    UFO.beamProgress=1;
+    p.x=UFO.x-5;
+    const landing=groundAt(0,p.x+5)-11;
+    p.y=Math.min(landing,p.y+1.15);
+    UFO.beamGroundY=landing+11;
+    if(p.y>=landing){
+      p.y=landing;
+      UFO.phase="leaveLeft";
+      UFO.phaseT=0;
+      UFO.beam=0;
+      UFO.beamProgress=0;
+      p.state="ufoLanded";
+    }
+
+  }else if(UFO.phase==="leaveLeft"){
+    UFO.x-=2.5;
+    if(UFO.phaseT>12 && p.state==="ufoLanded"){
+      p.state="run";
+      p.targetX=132;
+    }
+    if(UFO.x<-38){
+      UFO.active=false;
+      UFO.phase="idle";
+      UFO.phaseT=0;
+    }
+  }
+}
+
+function drawUfo(){
+  if(!UFO.active) return;
+  const x=Math.round(UFO.x), y=Math.round(UFO.y);
+
+  // Tractor beam: starts narrow under the saucer and grows DOWN to the terrain.
+  if(UFO.beam>0 && UFO.beamProgress>0){
+    const startY=y+5;
+    const fullGround=Math.max(startY+1, UFO.beamGroundY);
+    const endY=startY+(fullGround-startY)*UFO.beamProgress;
+    const fullHalf=16;
+    const endHalf=5+(fullHalf-5)*UFO.beamProgress;
+
+    g.save();
+    g.globalAlpha=0.18+UFO.beam*0.34;
+    g.fillStyle="#39ff72";
+    g.beginPath();
+    g.moveTo(x-6,startY);
+    g.lineTo(x+6,startY);
+    g.lineTo(x+endHalf,endY);
+    g.lineTo(x-endHalf,endY);
+    g.closePath();
+    g.fill();
+
+    g.globalAlpha=0.96;
+    g.strokeStyle="#7dff57";
+    g.lineWidth=1;
+    g.beginPath();
+    g.moveTo(x-6,startY); g.lineTo(x-endHalf,endY);
+    g.moveTo(x+6,startY); g.lineTo(x+endHalf,endY);
+    g.stroke();
+
+    // Bright contact line only when the beam has reached the ground.
+    if(UFO.beamProgress>=0.999){
+      g.globalAlpha=1.0;
+      g.strokeStyle="#eaff75";
+      g.beginPath();
+      g.moveTo(x-endHalf,endY);
+      g.lineTo(x+endHalf,endY);
+      g.stroke();
+    }
+    g.restore();
+  }
+
+  // Original compact 70s/80s arcade saucer.
+  g.save();
+  g.fillStyle="#d8d8d8";
+  g.strokeStyle="#111";
+  g.lineWidth=1;
+  g.beginPath();
+  g.ellipse(x,y,15,5,0,0,Math.PI*2);
+  g.fill(); g.stroke();
+
+  g.fillStyle="#7dd7e8";
+  g.beginPath();
+  g.ellipse(x,y-4,7,5,0,Math.PI,Math.PI*2);
+  g.fill(); g.stroke();
+
+  g.fillStyle="#f1f1f1";
+  g.fillRect(x-11,y-1,22,3);
+  g.strokeRect(x-11,y-1,22,3);
+
+  const blink=Math.floor(performance.now()/180)%2;
+  for(let i=-8;i<=8;i+=8){
+    g.fillStyle=blink ? "#fff3a0" : "#ff7b45";
+    g.fillRect(x+i-1,y+3,3,2);
+  }
+  g.restore();
+}
+
+function drawUfoRunner(p){
+  // Relaxed capture/drop pose: no spinning.
+  // Reuse the existing fall sprite to keep the approved runner identity.
+  sprite(S.fall[0],p.x,p.y);
+}
+
+
+// --- Offline-safe environment provider ---
+// Browser prototype:
+// - Time: local system clock works even without network.
+// - Weather: defaults to a neutral visual mode until online weather is wired in.
+// Cardputer ADV target:
+// - NTP/SNTP -> saved last-good time -> fallback clock.
+// - Weather API -> saved last-good weather -> neutral default weather.
+const ENV = {
+  weather: {
+    mode: "default",   // default / clear / cloudy / rain / snow / thunder
+    cloud: 35,
+    source: "fallback",
+    temperatureC: null,
+    humidityPct: null
+  },
+  fallbackEpoch: new Date(2026,0,1,12,0,0).getTime(),
+  bootPerf: performance.now()
+};
+
+// v112 astronomy state. Daily ephemeris is persisted separately from weather.
+const ASTRO_STORE_KEY="soundTerrariumEphemerisV1";
+const LOCATION_STORE_KEY="soundTerrariumLocationV1";
+let LOCATION={lat:35.6762,lon:139.6503,name:"Tokyo, Japan",timezone:"Asia/Tokyo"};
+try{ const x=JSON.parse(localStorage.getItem(LOCATION_STORE_KEY)||"null"); if(x&&Number.isFinite(x.lat)&&Number.isFinite(x.lon)) LOCATION=x; }catch(e){}
+function saveLocation(){
+  try{localStorage.setItem(LOCATION_STORE_KEY,JSON.stringify(LOCATION));}catch(e){}
+  const label=LOCATION.name||`${LOCATION.lat.toFixed(3)}, ${LOCATION.lon.toFixed(3)}`;
+  document.getElementById("locLabel").textContent=label;
+}
+saveLocation();
+const EPHEMERIS_RETRY_MS=60*60*1000;
+let lastEphemerisAttempt=0;
+const ASTRO = {
+  sunrise: 6*60,
+  sunset: 18*60,
+  moonrise: 18*60,
+  moonset: 6*60,
+  valid: false
+};
+let showClockInfo=true;
+let showAuxInfo=false; // I: SUN/MOON R/S + LOCATION; hidden by default
+
+function isoLocalMinutes(s){
+  if(typeof s!=="string") return null;
+  const m=/T(\d{2}):(\d{2})/.exec(s);
+  if(!m) return null;
+  return Number(m[1])*60+Number(m[2]);
+}
+function fmtMinutes(mins){
+  mins=((Math.round(mins)%1440)+1440)%1440;
+  return String(Math.floor(mins/60)).padStart(2,"0")+":"+String(mins%60).padStart(2,"0");
+}
+function minuteOfDay(d){
+  return d.getHours()*60+d.getMinutes()+d.getSeconds()/60;
+}
+function intervalPhase(nowMin,rise,set){
+  if(rise<set){
+    if(nowMin<rise || nowMin>=set) return null;
+    return (nowMin-rise)/Math.max(1,set-rise);
+  }
+  if(rise>set){
+    if(!(nowMin>=rise || nowMin<set)) return null;
+    const len=(1440-rise)+set;
+    const since=nowMin>=rise ? nowMin-rise : (1440-rise)+nowMin;
+    return since/Math.max(1,len);
+  }
+  return null;
+}
+function isSolarDayMinute(m){
+  return intervalPhase(m,ASTRO.sunrise,ASTRO.sunset)!==null;
+}
+
+function solarElevationProxy(m){
+  const sr=ASTRO.sunrise, ss=ASTRO.sunset;
+  if(!Number.isFinite(sr)||!Number.isFinite(ss)||sr===ss) return -1;
+
+  // Day arc: 0 at sunrise/sunset, +1 at solar noon.
+  const dayPhase=intervalPhase(m,sr,ss);
+  if(dayPhase!==null) return Math.sin(Math.PI*dayPhase);
+
+  // Night arc: 0 at sunset/sunrise, -1 around the middle of the night.
+  const nightPhase=intervalPhase(m,ss,sr);
+  if(nightPhase!==null) return -Math.sin(Math.PI*nightPhase);
+  return -1;
+}
+
+function daylightStrength(m){
+  // Convert solar elevation proxy to visual daylight.
+  // Twilight is therefore driven by the Sun's modeled elevation, not minutes.
+  const e=solarElevationProxy(m);
+  if(e>=0) return 0.68 + 0.32*Math.pow(e,0.55);
+  // Below horizon: retain a soft twilight only while the modeled Sun is near it.
+  // Because this comes from the night arc, the duration scales naturally with
+  // the location/date instead of being fixed at 60 minutes.
+  return Math.max(0, 0.68*(1-Math.min(1,(-e)/0.34)));
+}
+
+function moonVisibilityFromSun(m){
+  // Moon is strongest at night and becomes pale as daylight strengthens.
+  const d=daylightStrength(m);
+  return 1.0 - 0.78*d; // about 22% at the brightest part of the day
+}
+function celestialXYForPhase(phase){
+  phase=Math.max(0,Math.min(1,phase));
+  const R=11;
+  // At sunrise the Sun disk is already visible at the left edge;
+  // at sunset it reaches the right edge. Keep the existing low arc.
+  const x=R + (SW-2*R)*phase;
+  const horizonY=112;
+  const ry=76;
+  return {x, y:horizonY-ry*Math.sin(Math.PI*phase)};
+}
+
+
+function safeNow(){
+  // Return the wall-clock time of the selected LOCATION, not the computer's own zone.
+  try{
+    const realNow=new Date();
+    if(LOCATION.timezone){
+      const wall=new Date(realNow.toLocaleString("en-US",{timeZone:LOCATION.timezone}));
+      if(Number.isFinite(wall.getTime())) return wall;
+    }
+    if(Number.isFinite(realNow.getTime())) return realNow;
+  }catch(e){}
+  return new Date(ENV.fallbackEpoch + (performance.now()-ENV.bootPerf));
+}
+
+function weatherInfo(){
+  const w=ENV.weather || {};
+  return {
+    mode: ["default","clear","cloudy","rain","snow","thunder"].includes(w.mode) ? w.mode : "default",
+    cloud: Number.isFinite(w.cloud) ? Math.max(0,Math.min(100,w.cloud)) : 35,
+    source: w.source || "fallback",
+    temperatureC: Number.isFinite(w.temperatureC) ? w.temperatureC : null,
+    humidityPct: Number.isFinite(w.humidityPct) ? w.humidityPct : null
+  };
+}
+
+function modeFromWMO(code){
+  if(code===0) return "clear";
+  if(code>=1 && code<=3) return "cloudy";
+  if(code===45 || code===48) return "cloudy";
+  if((code>=51 && code<=67) || (code>=80 && code<=82)) return "rain";
+  if((code>=71 && code<=77) || code===85 || code===86) return "snow";
+  if(code>=95 && code<=99) return "thunder";
+  return "default";
+}
+
+function weatherLabel(){
+  const m=weatherInfo().mode;
+  return m==="clear" ? "SUNNY" :
+         m==="cloudy" ? "CLOUDY" :
+         m==="rain" ? "RAIN" :
+         m==="snow" ? "SNOW" :
+         m==="thunder" ? "THUNDER" : "--";
+}
+
+async function fetchCurrentWeather(){
+  // Weather is independent of the daily ephemeris.
+  const {lat,lon}=LOCATION;
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
+      `&current=weather_code,cloud_cover,temperature_2m,relative_humidity_2m&forecast_days=1&timezone=auto`;
+    const res=await fetch(url,{cache:"no-store"});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    const cur=data && data.current;
+    if(!cur || !Number.isFinite(Number(cur.weather_code))) throw new Error("weather_code missing");
+    ENV.weather.mode=modeFromWMO(Number(cur.weather_code));
+    ENV.weather.cloud=Number.isFinite(Number(cur.cloud_cover)) ? Number(cur.cloud_cover) : 0;
+    ENV.weather.temperatureC=Number.isFinite(Number(cur.temperature_2m)) ? Number(cur.temperature_2m) : null;
+    ENV.weather.humidityPct=Number.isFinite(Number(cur.relative_humidity_2m)) ? Math.round(Number(cur.relative_humidity_2m)) : null;
+    ENV.weather.source="open-meteo";
+    if(data.timezone){ LOCATION.timezone=data.timezone; saveLocation(); }
+  }catch(err){
+    console.warn("Weather fetch failed:",err);
+  }
+}
+
+function localDateKey(d=safeNow()){
+  return d.getFullYear()*10000+(d.getMonth()+1)*100+d.getDate();
+}
+function loadSavedEphemeris(){
+  try{
+    const x=JSON.parse(localStorage.getItem(ASTRO_STORE_KEY)||"null");
+    if(!x) return;
+    for(const k of ["sunrise","sunset","moonrise","moonset"]){
+      if(!Number.isFinite(x[k])) return;
+    }
+    ASTRO.sunrise=x.sunrise; ASTRO.sunset=x.sunset;
+    ASTRO.moonrise=x.moonrise; ASTRO.moonset=x.moonset;
+    ASTRO.dateKey=Number(x.dateKey)||0;
+    ASTRO.valid=true;
+  }catch(e){}
+}
+function saveEphemeris(){
+  try{
+    localStorage.setItem(ASTRO_STORE_KEY,JSON.stringify({
+      dateKey:ASTRO.dateKey,
+      sunrise:ASTRO.sunrise,sunset:ASTRO.sunset,
+      moonrise:ASTRO.moonrise,moonset:ASTRO.moonset
+    }));
+  }catch(e){}
+}
+async function fetchDailyEphemeris(){
+  const {lat,lon}=LOCATION;
+  lastEphemerisAttempt=Date.now();
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
+      `&daily=sunrise,sunset,moonrise,moonset&forecast_days=1&timezone=auto`;
+    const res=await fetch(url,{cache:"no-store"});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json(), d=data && data.daily;
+    if(!d) throw new Error("daily missing");
+
+    const sr=isoLocalMinutes(d.sunrise && d.sunrise[0]);
+    const ss=isoLocalMinutes(d.sunset && d.sunset[0]);
+    const mr=isoLocalMinutes(d.moonrise && d.moonrise[0]);
+    const ms=isoLocalMinutes(d.moonset && d.moonset[0]);
+
+    const sunOK=sr!==null && ss!==null && sr!==ss;
+    const moonOK=mr!==null && ms!==null && mr!==ms;
+    if(!sunOK && !moonOK) throw new Error("no valid ephemeris pair");
+
+    // Sun and Moon are independent. A missing lunar event must not discard
+    // a perfectly valid sunrise/sunset update, and vice versa.
+    if(sunOK){
+      ASTRO.sunrise=sr;
+      ASTRO.sunset=ss;
+    }
+    if(moonOK){
+      ASTRO.moonrise=mr;
+      ASTRO.moonset=ms;
+    }
+
+    ASTRO.dateKey=localDateKey();
+    ASTRO.valid=true;
+    saveEphemeris();
+    console.info("Daily ephemeris updated",{sunOK,moonOK,...ASTRO});
+    return true;
+  }catch(err){
+    console.warn("Ephemeris fetch failed; keeping last good values:",err);
+    return false;
+  }
+}
+function serviceDailyEphemeris(){
+  const today=localDateKey();
+  if(ASTRO.dateKey===today) return;
+  if(lastEphemerisAttempt && Date.now()-lastEphemerisAttempt<EPHEMERIS_RETRY_MS) return;
+  fetchDailyEphemeris();
+}
+
+function clockInfo(){
+  const now=safeNow();
+  const h=now.getHours();
+  const m=now.getMinutes();
+  const s=now.getSeconds();
+  const hourFloat=h+m/60+s/3600;
+  const md=minuteOfDay(now);
+  return {now,h,m,s,hourFloat,minute:md,isDay:isSolarDayMinute(md)};
+}
+
+function cloudColorForSky(storm=false){
+  // Use the same solar-elevation/daylight model that drives the sky,
+  // so cloud brightening/darkening follows the same dawn/dusk timing.
+  const dayMix=Math.max(0,Math.min(1,daylightStrength(minuteOfDay(safeNow()))));
+  let base=42 + dayMix*174;
+  if(storm) base=Math.max(24,Math.min(180,base-28));
+  return `rgb(${Math.round(base)},${Math.round(Math.min(255,base+2))},${Math.round(Math.min(255,base+7))})`;
+}
+function drawCloudShape(x,y,s,color){
+  g.fillStyle=color;
+  g.beginPath();
+  g.arc(x,y,7*s,0,Math.PI*2);
+  g.arc(x+8*s,y-3*s,9*s,0,Math.PI*2);
+  g.arc(x+17*s,y,7*s,0,Math.PI*2);
+  g.fill();
+  g.fillRect(x,y,17*s,7*s);
+}
+function drawCloud(x,y,s=1,storm=false){
+  // Gray silhouette around the cloud keeps it visible when the daylight-driven
+  // cloud fill becomes close to the CLOUDY sky color.
+  const outline=storm ? "#59636b" : "#7b858d";
+  const o=Math.max(1,1.35*s);
+  drawCloudShape(x-o,y,s,outline);
+  drawCloudShape(x+o,y,s,outline);
+  drawCloudShape(x,y-o,s,outline);
+  drawCloudShape(x,y+o,s,outline);
+  drawCloudShape(x,y,s,cloudColorForSky(storm));
+}
+
+function drawSunFace(cx,cy){
+  // Refined at the actual runtime size: 22px diameter.
+  const R=11, ink="#5a4527", face="#f3d58a";
+  g.save(); g.lineWidth=1; g.strokeStyle=ink; g.fillStyle=face;
+
+  for(let i=0;i<24;i++){
+    const a=i*Math.PI/12, r1=R+2, r2=R+(i%2===0?8:5);
+    g.beginPath();
+    g.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
+    g.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);
+    g.stroke();
+  }
+  g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.fill(); g.stroke();
+
+  // Brows + eyes
+  g.beginPath();
+  g.moveTo(cx-7,cy-4); g.quadraticCurveTo(cx-4,cy-6,cx-1,cy-4);
+  g.moveTo(cx+1,cy-4); g.quadraticCurveTo(cx+4,cy-6,cx+7,cy-4);
+  g.stroke();
+  for(const s of [-1,1]){
+    const ex=cx+s*4;
+    g.beginPath();
+    g.moveTo(ex-2,cy-2); g.quadraticCurveTo(ex,cy-4,ex+2,cy-2);
+    g.quadraticCurveTo(ex,cy,ex-2,cy-2); g.stroke();
+    g.fillStyle=ink; g.fillRect(Math.round(ex),Math.round(cy-2),1,1);
+  }
+
+  // Nose
+  g.beginPath();
+  g.moveTo(cx,cy-1);
+  g.quadraticCurveTo(cx-1,cy+2,cx-1,cy+3);
+  g.quadraticCurveTo(cx,cy+4,cx+2,cy+3);
+  g.stroke();
+
+  // Philtrum, small separated lips, chin.
+  g.beginPath(); g.moveTo(cx,cy+4); g.lineTo(cx,cy+5); g.stroke();
+  g.beginPath();
+  g.moveTo(cx-3,cy+6);
+  g.quadraticCurveTo(cx-1,cy+5,cx,cy+6);
+  g.quadraticCurveTo(cx+1,cy+5,cx+3,cy+6);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(cx-2,cy+7); g.quadraticCurveTo(cx,cy+8,cx+2,cy+7); g.stroke();
+  g.beginPath();
+  g.moveTo(cx-2,cy+9); g.quadraticCurveTo(cx,cy+10,cx+2,cy+9); g.stroke();
+
+  g.restore();
+}
+
+
+function lunarPhase01(dateObj=new Date()){
+  // 0=new moon, 0.25=first quarter, 0.5=full, 0.75=last quarter.
+  const SYNODIC_DAYS=29.530588853;
+  const REF_NEW_MOON_JD=2451550.25972; // 2000-01-06 18:14 UTC
+  const UNIX_JD=2440587.5;
+  const jd=UNIX_JD + dateObj.getTime()/86400000;
+  let p=((jd-REF_NEW_MOON_JD)/SYNODIC_DAYS)%1;
+  if(p<0) p+=1;
+  return p;
+}
+
+function drawMoonFace(cx,cy,sky){
+  // Same refined face proportions as the Sun, with astronomical lunar illumination.
+  const R=11, face="#f3d04f", ink="#5a4527", darkMoon="#4f5666";
+  const phase=lunarPhase01(safeNow());
+
+  g.save(); g.lineWidth=1;
+  g.fillStyle=darkMoon;
+  g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.fill();
+
+  g.fillStyle=face;
+  for(let yy=-R; yy<=R; yy++){
+    for(let xx=-R; xx<=R; xx++){
+      if(xx*xx+yy*yy>R*R) continue;
+      const z=Math.sqrt(Math.max(0,R*R-xx*xx-yy*yy));
+      const sx=-Math.sin(2*Math.PI*phase), sz=-Math.cos(2*Math.PI*phase);
+      if(xx*sx+z*sz>0) g.fillRect(Math.round(cx+xx),Math.round(cy+yy),1,1);
+    }
+  }
+  g.strokeStyle=ink;
+  g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.stroke();
+
+  g.beginPath();
+  g.moveTo(cx-7,cy-4); g.quadraticCurveTo(cx-4,cy-6,cx-1,cy-4);
+  g.moveTo(cx+1,cy-4); g.quadraticCurveTo(cx+4,cy-6,cx+7,cy-4);
+  g.stroke();
+  for(const s of [-1,1]){
+    const ex=cx+s*4;
+    g.beginPath();
+    g.moveTo(ex-2,cy-2); g.quadraticCurveTo(ex,cy-4,ex+2,cy-2);
+    g.quadraticCurveTo(ex,cy,ex-2,cy-2); g.stroke();
+    g.fillStyle=ink; g.fillRect(Math.round(ex),Math.round(cy-2),1,1);
+  }
+
+  g.beginPath();
+  g.moveTo(cx,cy-1);
+  g.quadraticCurveTo(cx-1,cy+2,cx-1,cy+3);
+  g.quadraticCurveTo(cx,cy+4,cx+2,cy+3);
+  g.stroke();
+
+  g.beginPath(); g.moveTo(cx,cy+4); g.lineTo(cx,cy+5); g.stroke();
+  g.beginPath();
+  g.moveTo(cx-3,cy+6);
+  g.quadraticCurveTo(cx-1,cy+5,cx,cy+6);
+  g.quadraticCurveTo(cx+1,cy+5,cx+3,cy+6);
+  g.stroke();
+  g.beginPath();
+  g.moveTo(cx-2,cy+7); g.quadraticCurveTo(cx,cy+8,cx+2,cy+7); g.stroke();
+  g.beginPath();
+  g.moveTo(cx-2,cy+9); g.quadraticCurveTo(cx,cy+10,cx+2,cy+9); g.stroke();
+
+  g.restore();
+}
+
+function moonXYForPhase(phase){
+  // At moonrise the lunar disk is already visibly entering at the left edge;
+  // at moonset it leaves at the right edge. Keep the low arc.
+  phase=Math.max(0,Math.min(1,phase));
+  const R=11;
+  const x=R + (SW-2*R)*phase;
+  const horizonY=112;
+  const ry=76;
+  return {x, y:horizonY-ry*Math.sin(Math.PI*phase)};
+}
+
+function skyColorForClock(c,w){
+  const rgb=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
+  const mix=(a,b,t)=>{
+    t=Math.max(0,Math.min(1,t)); a=rgb(a); b=rgb(b);
+    return `rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;
+  };
+  const NIGHT="#050509", HORIZON="#fff7e8", DAY="#d9efff";
+
+  const e=solarElevationProxy(c.minute);
+  const d=daylightStrength(c.minute);
+
+  // Near the horizon use a pale warm sky; as the Sun climbs, move toward day blue.
+  let sky;
+  if(e>=0){
+    const high=Math.max(0,Math.min(1,e));
+    sky=mix(HORIZON,DAY,Math.pow(high,0.7));
+  }else{
+    sky=mix(NIGHT,HORIZON,d/0.68);
+  }
+
+  if(c.isDay && (w.mode==="rain"||w.mode==="thunder")) sky="#aeb9c3";
+  else if(c.isDay && w.mode==="cloudy") sky="#d6dde1";
+  return sky;
+}
+
+function readableInkForSky(sky){
+  // skyColorForClock() may return either #RRGGBB or rgb(r,g,b).
+  // Recalculate contrast from the CURRENT LOCATION sky on every HUD draw.
+  let r=0,g2=0,b=0;
+  if(/^#[0-9a-f]{6}$/i.test(String(sky))){
+    r=parseInt(sky.slice(1,3),16);
+    g2=parseInt(sky.slice(3,5),16);
+    b=parseInt(sky.slice(5,7),16);
+  }else{
+    const m=String(sky).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i);
+    if(!m) return "#fff";
+    r=Number(m[1]); g2=Number(m[2]); b=Number(m[3]);
+  }
+  const lum=0.2126*r+0.7152*g2+0.0722*b;
+  return lum>145?"#111":"#fff";
+}
+
+function drawSkyAndClock(){
+  const c=clockInfo();
+  const w=weatherInfo();
+  const t=performance.now()/1000;
+  const sky=skyColorForClock(c,w);
+  const ink=readableInkForSky(sky);
+
+  g.fillStyle=sky;
+  g.fillRect(0,0,SW,SH);
+
+  // Sun and Moon use independent real rise/set schedules.
+  // CLOUDY does not delete them; foreground clouds can cover them naturally.
+  const hide=(w.mode==="rain" || w.mode==="thunder");
+  if(!hide){
+    const sp=intervalPhase(c.minute,ASTRO.sunrise,ASTRO.sunset);
+    if(sp!==null){
+      const p=celestialXYForPhase(sp);
+      drawSunFace(p.x,p.y);
+    }
+    const mp=intervalPhase(c.minute,ASTRO.moonrise,ASTRO.moonset);
+    if(mp!==null){
+      const p=moonXYForPhase(mp);
+      const moonAlpha=moonVisibilityFromSun(c.minute);
+      g.save();
+      g.globalAlpha=moonAlpha;
+      drawMoonFace(p.x,p.y,sky);
+      g.restore();
+    }
+  }
+
+  // Stars always exist when the Sun is below the horizon.
+  // White stays dominant; sparse blue/red/yellow accents add a retro-game feel.
+  // Only some stars twinkle, with staggered phases so they never blink in unison.
+  if(!c.isDay){
+    const stars=[
+      [8,14,"#ffffff",0],[24,33,"#ffffff",1],[41,18,"#4da6ff",0],[59,49,"#ffffff",0],
+      [78,10,"#ffd84d",0],[96,37,"#ffffff",1],[116,24,"#ffffff",0],[136,54,"#ff5a4d",0],
+      [157,15,"#ffffff",1],[177,41,"#ffffff",0],[198,28,"#4da6ff",0],[219,9,"#ffffff",0],
+      [242,46,"#ffd84d",1],[265,22,"#ffffff",0],[288,57,"#ffffff",0],[309,17,"#ff5a4d",0],
+      [33,67,"#ffffff",0],[89,61,"#4da6ff",1],[151,70,"#ffffff",0],[214,64,"#ffffff",0],
+      [277,72,"#ffd84d",0]
+    ];
+    const tick=Math.floor(t/0.42);
+    for(let i=0;i<stars.length;i++){
+      const [sx,sy,color,twinkle]=stars[i];
+      let visible=true;
+      if(twinkle){
+        const phase=(tick+i*3)%7;
+        visible=!(phase===0 || phase===1);
+      }
+      if(!visible) continue;
+      g.globalAlpha=1;
+      g.fillStyle=color;
+      g.fillRect(sx,sy,1,1);
+    }
+    g.globalAlpha=1;
+  }
+
+  let baseClouds=w.mode==="clear"?0:w.mode==="cloudy"?3:w.mode==="rain"?5:w.mode==="snow"?4:w.mode==="thunder"?6:1;
+  let cloudAdj=w.cloud>=85?2:w.cloud>=65?1:w.cloud<=20?-1:0;
+  let cloudCount=Math.max(0,Math.min(8,baseClouds+cloudAdj));
+  if(w.mode==="clear" && w.cloud>=25) cloudCount=1;
+  for(let i=0;i<cloudCount;i++){
+    const speed=1.2+i*0.18;
+    // Keep active clouds distributed around the full travel loop.
+    // The previous formula started every cloud off-screen to the right,
+    // so CLOUDY could show an empty sky for tens of seconds after loading.
+    const span=SW+120;
+    const spacing=span/Math.max(1,cloudCount);
+    const phase=(t*speed + i*spacing + 80)%span;
+    const x=SW+30-phase;
+    const y=100+(i%2)*17;
+    drawCloud(x,y,0.72+(i%3)*0.08,w.mode==="rain"||w.mode==="thunder");
+  }
+
+  if(w.mode==="rain" || w.mode==="thunder"){
+    g.strokeStyle="#617f9f";
+    const precipBottom=216;
+    for(let i=0;i<34;i++){
+      const x=(i*9 + (t*22)%19)%SW;
+      const y=((i*37 + t*45)%(precipBottom+16))-12;
+      g.beginPath(); g.moveTo(x,y); g.lineTo(x+2,y+7); g.stroke();
+    }
+  }else if(w.mode==="snow"){
+    g.fillStyle=c.isDay ? "#ffffff" : "#dce6f2";
+    const precipBottom=216;
+    for(let i=0;i<28;i++){
+      const x=(i*23 + (t*5)%(SW+20))%(SW+20)-10;
+      const y=((i*31 + t*9)%(precipBottom+16))-12;
+      g.fillRect(Math.round(x),Math.round(y),2,2);
+    }
+  }
+
+  if(w.mode==="thunder" && Math.floor(t*2)%17===0){
+    g.fillStyle="rgba(255,255,255,0.30)";
+    g.fillRect(0,0,SW,SH);
+  }
+
+  g.textAlign="left";
+  g.textBaseline="alphabetic";
+}
+
+
+
+
+
+function lerpRgbCss(a,b,t){
+  t=Math.max(0,Math.min(1,t));
+  const c=a.map((v,i)=>Math.round(v+(b[i]-v)*t));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
+function clockRetroPalette(c){
+  const d=daylightStrength(c.minute); // 0=night, 1=bright day
+  return {
+    date: lerpRgbCss([102,255,255],[0,64,160],d),
+    time: lerpRgbCss([255,255,64],[0,0,0],d),
+    weather: lerpRgbCss([255,79,216],[144,0,88],d)
+  };
+}
+
+function drawClockInfoOverlay(){
+  if(!showClockInfo && !showAuxInfo) return;
+
+  // T and I are deliberately independent:
+  // T = date/time/weather/TEMP/HUM, I = SUN/MOON schedule + LOCATION.
+  const c=clockInfo();
+  const w=weatherInfo();
+  const sky=skyColorForClock(c,w);
+  const ink=readableInkForSky(sky);
+
+  g.fillStyle=ink;
+  g.textBaseline="top";
+
+  if(showAuxInfo){
+    g.font="bold 8px monospace";
+    g.textAlign="left";
+    g.fillText(`SUN  R${fmtMinutes(ASTRO.sunrise)} S${fmtMinutes(ASTRO.sunset)}`,3,3);
+    g.fillText(`MOON R${fmtMinutes(ASTRO.moonrise)} S${fmtMinutes(ASTRO.moonset)}`,3,13);
+
+    let locText=(LOCATION.name||`${LOCATION.lat.toFixed(2)}, ${LOCATION.lon.toFixed(2)}`).toUpperCase();
+    if(locText.length>34) locText=locText.slice(0,33)+"…";
+    g.textAlign="left";
+    g.font="bold 7px monospace";
+    g.fillText(locText,3,SH-10);
+  }
+
+  if(showClockInfo){
+    const yyyy=c.now.getFullYear();
+    const mm=String(c.now.getMonth()+1).padStart(2,"0");
+    const dd=String(c.now.getDate()).padStart(2,"0");
+    const days=["SUN","MON","TUE","WED","THU","FRI","SAT"];
+    const dateText=yyyy+"."+mm+"."+dd+" "+days[c.now.getDay()];
+    const timeText=String(c.h).padStart(2,"0")+":"+String(c.m).padStart(2,"0");
+
+    const temp=w.temperatureC===null ? "--.-" : w.temperatureC.toFixed(1);
+    const hum=w.humidityPct===null ? "--" : String(w.humidityPct);
+
+    g.font="bold 8px monospace";
+    g.textAlign="left";
+    g.fillText(`TEMP ${temp}C`,232,3);
+    g.fillText(`HUM  ${hum}%`,232,13);
+
+    const retro=clockRetroPalette(c);
+
+    g.textAlign="center";
+    g.font="bold 11px monospace";
+    g.fillStyle=retro.date;
+    g.fillText(dateText,SW/2,62);
+
+    g.font="bold 34px monospace";
+    g.fillStyle=retro.time;
+    g.fillText(timeText,SW/2,78);
+
+    g.font="bold 8px monospace";
+    g.fillStyle=retro.weather;
+    g.fillText(weatherLabel(),SW/2,116);
+
+    g.fillStyle=ink;
+  }
+
+  g.textAlign="left";
+  g.textBaseline="alphabetic";
+  g.globalAlpha=1;
+}
+
+function drawVisibleEq(ink){
+  const eq=currentEqGeometry();
+
+  g.save();
+  g.lineWidth=1;
+  for(let b=0;b<eq.count;b++){
+    const x=eq.x0+b*(eq.barW+eq.gap);
+    const y=eq.tops[b];
+    const h=eq.horizonY-y;
+
+    g.fillStyle=EQ_Y_COLORS[b];
+    g.fillRect(x,y,eq.barW,h);
+    g.strokeStyle=ink;
+    g.strokeRect(x+0.5,y+0.5,eq.barW-1,h-1);
+  }
+  g.restore();
+}
+
+function draw(){
+  drawSkyAndClock();
+
+  const h=histories[0];
+
+  // SOUND TERRARIUM ground: warm sand by day, saturated primary blue at night.
+  // The sound-generated terrain profile itself is unchanged.
+  const cinfo=clockInfo();
+  const winfo=weatherInfo();
+  const skyNow=skyColorForClock(cinfo,winfo);
+  const roadInk=readableInkForSky(skyNow);
+
+  g.save();
+  g.beginPath();
+  g.moveTo(0,Math.round(h[0])+0.5);
+  for(let x=1;x<SW;x++) g.lineTo(x,Math.round(h[x])+0.5);
+  g.lineTo(SW,SH);
+  g.lineTo(0,SH);
+  g.closePath();
+  g.fillStyle=cinfo.isDay ? "#E9B86A" : "#0000FF";
+  g.fill();
+  g.restore();
+
+  // 1 px road edge uses the same black/white contrast rule as the clock.
+  g.strokeStyle=roadInk;
+  g.lineWidth=1;
+  g.beginPath();
+  g.moveTo(0,Math.round(h[0])+0.5);
+  for(let x=1;x<SW;x++) g.lineTo(x,Math.round(h[x])+0.5);
+  g.stroke();
+
+  // small readout
+  g.font="7px monospace";
+  g.fillStyle="#fff";
+  g.globalAlpha=.75;
+  g.globalAlpha=1;
+
+  const p=people[0];
+  if(runnerLost){
+    // Intentionally invisible during the five-second rescue wait.
+  }else if(UFO.active && (p.state==="ufoWait" || p.state==="ufoLanded")){
+    drawUfoRunner(p);
+  }else if(p.state==="run"){
+    const divisor=runBeatBoost>0.22?4:8;
+    const frame=Math.floor(tick/divisor)%3;
+    sprite(S.run[frame],p.x,p.y);
+  }else if(p.state==="jump"){
+    sprite(S.jump[0],p.x,p.y);
+  }else if(p.state==="wave"){
+    const seq=[0,1,2,1];
+    sprite(S.wave[seq[Math.floor(p.waveT/7)%4]],p.x,p.y);
+  }else if(p.state==="fall"||p.state==="gapfall"||p.state==="gapland"){
+    sprite(S.fall[0],p.x,p.y);
+  }else{
+    sprite(S.climb[Math.floor((p.climbT||0)/4)%2],p.x,p.y);
+  }
+
+  // Keep the eight-band EQ visible in the lower-right foreground.
+  drawVisibleEq(roadInk);
+
+  drawUfo();
+
+  // Final presentation pass: location-dependent date/time/weather/location
+  // and text contrast are recomputed after the world has been drawn.
+  drawClockInfoOverlay();
+}
+
+let lastLoopErrorLogMs=0;
+function loop(t){
+  // Schedule the next frame first so a single unexpected exception cannot
+  // permanently stop the browser demo's animation loop.
+  requestAnimationFrame(loop);
+  try{
+    if(!last)last=t;
+    analyzeAudio(t);
+    updateAdaptiveEqNorm();
+    updateTerrain();
+    beatAdvance();
+    updateUfo();
+    for(let i=0;i<N;i++)updatePerson(i);
+    draw();
+    tick++;
+  }catch(err){
+    const now=performance.now();
+    if(now-lastLoopErrorLogMs>2000){
+      console.error("SOUND TERRARIUM frame error:",err);
+      lastLoopErrorLogMs=now;
+    }
+  }
+  last=t;
+}
+
+document.getElementById("share").addEventListener("click",async()=>{
+  try{
+    if(sharedStream)sharedStream.getTracks().forEach(t=>t.stop());
+    if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended")await audioCtx.resume();
+
+    sharedStream=await navigator.mediaDevices.getUserMedia({
+      audio:{
+        echoCancellation:false,
+        noiseSuppression:false,
+        autoGainControl:false
+      },
+      video:false
+    });
+    const tracks=sharedStream.getAudioTracks();
+    if(!tracks.length)throw new Error("No microphone audio detected.");
+
+    const stream=new MediaStream(tracks);
+    const src=audioCtx.createMediaStreamSource(stream);
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=4096;
+    analyser.smoothingTimeConstant=0.68;
+    src.connect(analyser);
+    freq=new Uint8Array(analyser.frequencyBinCount);
+    demoMode=false;
+    document.getElementById("m").textContent="audio: microphone";
+
+    sharedStream.getTracks().forEach(track=>{
+      track.addEventListener("ended",()=>{
+        analyser=null;freq=null;demoMode=true;
+        document.getElementById("m").textContent="audio: demo";
+      });
+    });
+  }catch(e){
+    document.getElementById("m").textContent="audio error: "+e.message;
+  }
+});
+
+document.getElementById("infoToggle").onclick=()=>{
+  showAuxInfo=!showAuxInfo;
+};
+
+document.getElementById("clockToggle").onclick=()=>{
+  showClockInfo=!showClockInfo;
+};
+
+document.getElementById("ufoTest").addEventListener("click",()=>{
+  startUfoShift();
+});
+
+window.addEventListener("keydown",(ev)=>{
+  if(ev.repeat) return;
+  const k=ev.key.toLowerCase();
+  if(k==="j"){
+    const p=people[0];
+    if(!UFO.active && p.state==="run"){
+      p.state="jump";
+      p.jumpT=0;
+      p.y=groundAt(0,p.x+5)-11;
+    }
+  }else if(k==="w"){
+    const p=people[0];
+    if(!UFO.active && p.state==="run"){
+      p.state="wave";
+      p.waveT=0;
+      p.waveGroundX=p.x;
+      p.y=groundAt(0,p.x+5)-11;
+    }
+  }else if(k==="u"){
+    startUfoShift();
+  }else if(k==="t"){
+    showClockInfo=!showClockInfo;
+  }else if(k==="i"){
+    showAuxInfo=!showAuxInfo;
+  }
+});
+
+
+
+loadSavedEphemeris();
+fetchCurrentWeather();
+fetchDailyEphemeris();
+setInterval(fetchCurrentWeather,30*60*1000);
+// Check often for a date rollover; failed ephemeris requests are rate-limited to hourly.
+setInterval(serviceDailyEphemeris,60*1000);
+
+requestAnimationFrame(loop);
+
+const locStatus=document.getElementById("locStatus");
+function setLocationStatus(text){ locStatus.textContent=text||""; }
+async function refreshEnvironmentForLocation(){
+  // IMPORTANT: do this sequentially. Weather response establishes the selected
+  // location's timezone first; then today's ephemeris is requested/evaluated in
+  // that timezone. Finally force an immediate redraw so sky AND ground switch now.
+  ENV.weather.mode="default"; ENV.weather.cloud=35;
+  ENV.weather.temperatureC=null; ENV.weather.humidityPct=null; ENV.weather.source="refreshing";
+  ASTRO.dateKey=0; ASTRO.valid=false; lastEphemerisAttempt=0;
+  await fetchCurrentWeather();
+  await fetchDailyEphemeris();
+
+  // Full LOCATION presentation refresh:
+  // date / weekday / time / weather / temperature / humidity / Sun / Moon /
+  // sky / ground / text contrast are all re-evaluated from the new location.
+  draw();
+}
+
+async function setCityLocation(name){
+  name=(name||"").trim();
+  if(!name){
+    setLocationStatus("Enter a city name");
+    document.getElementById("city").focus();
+    return;
+  }
+  setLocationStatus("Searching...");
+  const res=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`);
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data=await res.json(), r=data.results&&data.results[0];
+  if(!r) throw new Error("Location not found");
+  LOCATION={lat:Number(r.latitude),lon:Number(r.longitude),name:`${r.name}${r.admin1?", "+r.admin1:""}${r.country?", "+r.country:""}`,timezone:r.timezone||""};
+  saveLocation();
+  document.getElementById("city").value=LOCATION.name;
+  // LOCATION SET is a complete environment refresh, including local sky/ground state.
+  setLocationStatus("Updating all data...");
+  await refreshEnvironmentForLocation();
+  setLocationStatus("SET / UPDATED");
+}
+document.getElementById("setCity").onclick=async()=>{
+  try{ await setCityLocation(document.getElementById("city").value); }
+  catch(e){ setLocationStatus("ERROR"); alert("Location setup failed: "+e.message); }
+};
+document.getElementById("city").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("setCity").click(); });
+document.getElementById("useLocation").onclick=()=>{
+  if(!navigator.geolocation){alert("Geolocation is not available in this browser.");return;}
+  setLocationStatus("Locating...");
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const lat=pos.coords.latitude, lon=pos.coords.longitude;
+    // Browser geolocation gives coordinates, not a city name. Resolve a readable
+    // locality when possible; coordinates remain a safe fallback.
+    let resolvedName=`${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    try{
+      const rr=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,{cache:"no-store"});
+      if(rr.ok){
+        const rd=await rr.json();
+        const city=rd.city||rd.locality||rd.principalSubdivision||"";
+        const country=rd.countryName||"";
+        if(city || country) resolvedName=[city,country].filter(Boolean).join(", ");
+      }
+    }catch(e){ console.warn("Reverse geocoding failed:",e); }
+    LOCATION={lat,lon,name:resolvedName,timezone:""};
+    saveLocation();
+    // Synchronize the editable field with the location that was actually selected.
+    document.getElementById("city").value=LOCATION.name;
+    setLocationStatus("Updating all data...");
+    await refreshEnvironmentForLocation();
+    setLocationStatus("SET / UPDATED");
+  },err=>{setLocationStatus("ERROR"); alert("Location access failed: "+err.message);});
+};
+</script>
+<div style="position:fixed;left:12px;bottom:10px;font:12px monospace;color:#777;pointer-events:none">I: EXTRA INFO (SUN/MOON R/S + LOCATION)</div>
+</body>
+</html>
