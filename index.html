@@ -1,11 +1,11 @@
-<!-- SOUND TERRARIUM HTML v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
+<!-- SOUND TERRARIUM HTML v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability (T).\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
   v116: adds TIME/DATE button for visible clock-overlay control. -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SOUND TERRARIUM v120 — worldwide browser version</title>
+<title>SOUND TERRARIUM v122 — worldwide browser version</title>
 <style>
 body{margin:0;padding:16px;background:#111;color:#ddd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 h2{font-size:18px;margin:0 0 6px}
@@ -29,7 +29,7 @@ button{padding:7px 10px;background:#222;color:#fff;border:1px solid #666;border-
 <span class="meter" id="m">audio: demo</span>
 </div>
 <div class="row"><input id="city" placeholder="City: New York, London, Tokyo"><button id="setCity">LOCATION SET</button><button id="useLocation">USE CURRENT LOCATION</button><span class="meter" id="locLabel">Tokyo, Japan</span><span class="meter" id="locStatus"></span></div>
-<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, clock, weather and TEMP/HUM, I = show/hide SUN/MOON rise/set and LOCATION.</div>
+<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, clock, weather and TEMP/HUM, I = show/hide SUN/MOON rise/set, tide, pressure, rain probability and LOCATION.</div>
 
 <script>
 const S={"jump":[["......b...",".....www..",".....www..","....www...","wwwwowww..","...bww..ww","....ww....","....wwwwww",".wwwwb....","..........",".........."]],"run":[["......b...",".....www..",".....www..","....www...","..wwowww..",".wwbww..ww","....ww....","....www...",".wwwwbww..","......ww..","......ww.."],["......b...",".....www..",".....www..",".....ww...","....www...","...wwwww..","...wwwwbww",".....www..","....wwww..","...www....","....ww...."],["......b...",".....www..",".....www..",".....ww...","...wwwwbb.","..wwowwww.",".....ww...","....wwww..","...ww..ww.","..ww...ww.","..ww......"]],"fall":[["ww..b..ww.","wwowwwoww.","wwowwwoww.",".wwwwwww..","...ww.....","...ww.....","...wwww...","...wwbww..","...wwbww..","...wwbww..","...ww....."]],"climb":[["....ww....","....ww...o","....wwwwww",".o..www...",".wwwwww...","....www...","....www...","...wwbww..","...wwbwww.","...ww.....","..www....."],["....ww....","b...ww....","wwwwww....","...www..b.","...wwwwww.","...www....","...www....","..wwoww...",".wwwoww...",".....ww...",".....www.."]],"wave":[["....ww.w..","...wwwww..","...wwww...","....ww....","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww..w.","...wwww.w.","...wwww.w.","....ww.w..","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww....","...wwww...","...wwww...","....ww....","...wwwwwww","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."]],"trip":[["..........","..........","......b...",".....www..","....wwww..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."],["..........","..........","..........","......b...",".....www..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."]]};
@@ -621,7 +621,7 @@ function updateUfo(){
   if(UFO.phase==="enterLeft"){
     // Track the moving runner while approaching.
     UFO.targetX=p.x+5;
-    UFO.x+=0.4;
+    UFO.x+=2.0;
     if(UFO.x>=UFO.targetX){
       UFO.x=UFO.targetX;
       UFO.phase="hoverBeforeBeam";
@@ -642,8 +642,8 @@ function updateUfo(){
   }else if(UFO.phase==="beamGrow"){
     // Beam grows DOWNWARD from the saucer toward the current terrain.
     UFO.x=p.x+5;
-    UFO.beam=Math.min(1,UFO.beam+0.0055);
-    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.0024);
+    UFO.beam=Math.min(1,UFO.beam+0.05);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
     UFO.beamGroundY=groundAt(0,p.x+5);
 
     if(UFO.beamProgress>=1){
@@ -672,7 +672,7 @@ function updateUfo(){
     UFO.beamProgress=1;
     // Raised-arms/relaxed capture pose, lifted straight upward.
     p.x=UFO.x-5;
-    p.y-=0.145;
+    p.y-=1.15;
     if(p.y<UFO.y+8){
       UFO.phase="exitRight";
       UFO.phaseT=0;
@@ -681,7 +681,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="exitRight"){
-    UFO.x+=0.5;
+    UFO.x+=2.5;
     p.x=UFO.x-5;
     p.y=UFO.y+5;
     if(UFO.x>SW+38){
@@ -694,7 +694,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="returnRight"){
-    UFO.x-=0.45;
+    UFO.x-=2.2;
     UFO.targetX=132+5;
     if(UFO.x<=UFO.targetX){
       UFO.x=UFO.targetX;
@@ -705,7 +705,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="returnLeft"){
-    UFO.x+=0.45;
+    UFO.x+=2.2;
     UFO.targetX=132+5;
     if(UFO.x>=UFO.targetX){
       UFO.x=UFO.targetX;
@@ -717,8 +717,8 @@ function updateUfo(){
 
   }else if(UFO.phase==="dropBeamGrow"){
     // Delivery beam also grows down to the terrain first.
-    UFO.beam=Math.min(1,UFO.beam+0.0055);
-    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.0024);
+    UFO.beam=Math.min(1,UFO.beam+0.05);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
     UFO.beamGroundY=groundAt(0,UFO.x);
     if(UFO.beamProgress>=1){
       UFO.phase="drop";
@@ -733,7 +733,7 @@ function updateUfo(){
     UFO.beamProgress=1;
     p.x=UFO.x-5;
     const landing=groundAt(0,p.x+5)-11;
-    p.y=Math.min(landing,p.y+0.145);
+    p.y=Math.min(landing,p.y+1.15);
     UFO.beamGroundY=landing+11;
     if(p.y>=landing){
       p.y=landing;
@@ -745,7 +745,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="leaveLeft"){
-    UFO.x-=0.5;
+    UFO.x-=2.5;
     if(UFO.phaseT>12 && p.state==="ufoLanded"){
       p.state="run";
       p.targetX=132;
@@ -847,7 +847,9 @@ const ENV = {
     cloud: 35,
     source: "fallback",
     temperatureC: null,
-    humidityPct: null
+    humidityPct: null,
+    pressureMslHpa: null,
+    precipitationProbabilityPct: null
   },
   fallbackEpoch: new Date(2026,0,1,12,0,0).getTime(),
   bootPerf: performance.now()
@@ -873,8 +875,18 @@ const ASTRO = {
   moonset: 6*60,
   valid: false
 };
+
+const TIDE_REFRESH_MS=6*60*60*1000;
+const TIDE_RETRY_MS=30*60*1000;
+let lastTideAttempt=0;
+const TIDE = {
+  valid:false,
+  rising:false,
+  nextHighEpoch:0,
+  nextLowEpoch:0
+};
 let showClockInfo=true;
-let showAuxInfo=false; // I: SUN/MOON R/S + LOCATION; hidden by default
+let showAuxInfo=false; // I: SUN/MOON R/S + TIDE + LOCATION; hidden by default
 
 function isoLocalMinutes(s){
   if(typeof s!=="string") return null;
@@ -968,7 +980,9 @@ function weatherInfo(){
     cloud: Number.isFinite(w.cloud) ? Math.max(0,Math.min(100,w.cloud)) : 35,
     source: w.source || "fallback",
     temperatureC: Number.isFinite(w.temperatureC) ? w.temperatureC : null,
-    humidityPct: Number.isFinite(w.humidityPct) ? w.humidityPct : null
+    humidityPct: Number.isFinite(w.humidityPct) ? w.humidityPct : null,
+    pressureMslHpa: Number.isFinite(w.pressureMslHpa) ? w.pressureMslHpa : null,
+    precipitationProbabilityPct: Number.isFinite(w.precipitationProbabilityPct) ? w.precipitationProbabilityPct : null
   };
 }
 
@@ -996,7 +1010,8 @@ async function fetchCurrentWeather(){
   const {lat,lon}=LOCATION;
   try{
     const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`+
-      `&current=weather_code,cloud_cover,temperature_2m,relative_humidity_2m&forecast_days=1&timezone=auto`;
+      `&current=weather_code,cloud_cover,temperature_2m,relative_humidity_2m,pressure_msl`+
+      `&hourly=precipitation_probability&forecast_hours=1&timezone=auto`;
     const res=await fetch(url,{cache:"no-store"});
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
@@ -1006,11 +1021,109 @@ async function fetchCurrentWeather(){
     ENV.weather.cloud=Number.isFinite(Number(cur.cloud_cover)) ? Number(cur.cloud_cover) : 0;
     ENV.weather.temperatureC=Number.isFinite(Number(cur.temperature_2m)) ? Number(cur.temperature_2m) : null;
     ENV.weather.humidityPct=Number.isFinite(Number(cur.relative_humidity_2m)) ? Math.round(Number(cur.relative_humidity_2m)) : null;
+    ENV.weather.pressureMslHpa=(cur.pressure_msl!==null && Number.isFinite(Number(cur.pressure_msl))) ? Number(cur.pressure_msl) : null;
+    const popRaw=data && data.hourly && Array.isArray(data.hourly.precipitation_probability)
+      ? data.hourly.precipitation_probability[0] : null;
+    const pop=popRaw!==null ? Number(popRaw) : NaN;
+    ENV.weather.precipitationProbabilityPct=Number.isFinite(pop) ? Math.round(pop) : null;
     ENV.weather.source="open-meteo";
     if(data.timezone){ LOCATION.timezone=data.timezone; saveLocation(); }
   }catch(err){
     console.warn("Weather fetch failed:",err);
   }
+}
+
+
+function fmtTideEpoch(epochSec){
+  if(!Number.isFinite(epochSec) || epochSec<=0) return "--:--";
+  try{
+    const opts={hour:"2-digit",minute:"2-digit",hour12:false};
+    if(LOCATION.timezone) opts.timeZone=LOCATION.timezone;
+    return new Intl.DateTimeFormat("en-GB",opts).format(new Date(epochSec*1000));
+  }catch(e){
+    const d=new Date(epochSec*1000);
+    return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  }
+}
+
+async function fetchTides(){
+  const {lat,lon}=LOCATION;
+  lastTideAttempt=Date.now();
+  try{
+    const url=`https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}`+
+      `&hourly=sea_level_height_msl&past_hours=2&forecast_hours=36`+
+      `&timeformat=unixtime&timezone=GMT&cell_selection=sea`;
+    const res=await fetch(url,{cache:"no-store"});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    const h=data && data.hourly;
+    const times=h && h.time;
+    const levels=h && h.sea_level_height_msl;
+    if(!Array.isArray(times) || !Array.isArray(levels)) throw new Error("tide arrays missing");
+
+    const pts=[];
+    const n=Math.min(times.length,levels.length);
+    for(let i=0;i<n;i++){
+      if(times[i]===null || levels[i]===null) continue;
+      const t=Number(times[i]), y=Number(levels[i]);
+      if(Number.isFinite(t) && Number.isFinite(y)) pts.push({t,y});
+    }
+    if(pts.length<5) throw new Error("not enough tide data");
+
+    const nowSec=Date.now()/1000;
+    let rising=false;
+    let trendFound=false;
+    for(let i=0;i<pts.length-1;i++){
+      if(pts[i].t<=nowSec && nowSec<pts[i+1].t){
+        rising=pts[i+1].y>=pts[i].y;
+        trendFound=true;
+        break;
+      }
+    }
+    if(!trendFound){
+      const k=pts.findIndex(p=>p.t>nowSec);
+      if(k>0) rising=pts[k].y>=pts[k-1].y;
+      else rising=pts[pts.length-1].y>=pts[pts.length-2].y;
+    }
+
+    let nextHigh=0, nextLow=0;
+    for(let i=1;i<pts.length-1;i++){
+      const p0=pts[i-1], p1=pts[i], p2=pts[i+1];
+      const isHigh=p1.y>p0.y && p1.y>=p2.y;
+      const isLow =p1.y<p0.y && p1.y<=p2.y;
+      if(!isHigh && !isLow) continue;
+
+      let te=p1.t;
+      const den=p0.y-2*p1.y+p2.y;
+      if(Math.abs(den)>1e-9){
+        let frac=0.5*(p0.y-p2.y)/den;
+        frac=Math.max(-1,Math.min(1,frac));
+        const dt=(p2.t-p1.t);
+        te=p1.t+frac*dt;
+      }
+      if(te<=nowSec) continue;
+      if(isHigh && !nextHigh) nextHigh=te;
+      if(isLow && !nextLow) nextLow=te;
+      if(nextHigh && nextLow) break;
+    }
+
+    if(!nextHigh || !nextLow) throw new Error("future high/low not found");
+    TIDE.valid=true;
+    TIDE.rising=rising;
+    TIDE.nextHighEpoch=nextHigh;
+    TIDE.nextLowEpoch=nextLow;
+    return true;
+  }catch(err){
+    console.warn("Tide fetch failed; keeping last good values:",err);
+    return false;
+  }
+}
+
+function serviceTides(){
+  const now=Date.now();
+  const wait=TIDE.valid ? TIDE_REFRESH_MS : TIDE_RETRY_MS;
+  if(lastTideAttempt && now-lastTideAttempt<wait) return;
+  fetchTides();
 }
 
 function localDateKey(d=safeNow()){
@@ -1417,7 +1530,7 @@ function drawClockInfoOverlay(){
   if(!showClockInfo && !showAuxInfo) return;
 
   // T and I are deliberately independent:
-  // T = date/time/weather/TEMP/HUM, I = SUN/MOON schedule + LOCATION.
+  // T = date/time/weather/TEMP/HUM, I = SUN/MOON schedule + TIDE + PRES/RAIN + LOCATION.
   const c=clockInfo();
   const w=weatherInfo();
   const sky=skyColorForClock(c,w);
@@ -1432,10 +1545,24 @@ function drawClockInfoOverlay(){
     g.fillText(`SUN  R${fmtMinutes(ASTRO.sunrise)} S${fmtMinutes(ASTRO.sunset)}`,3,3);
     g.fillText(`MOON R${fmtMinutes(ASTRO.moonrise)} S${fmtMinutes(ASTRO.moonset)}`,3,13);
 
+    const highText=TIDE.valid ? fmtTideEpoch(TIDE.nextHighEpoch) : "--:--";
+    const lowText=TIDE.valid ? fmtTideEpoch(TIDE.nextLowEpoch) : "--:--";
+    const tideText=TIDE.valid ? (TIDE.rising ? "TIDE UP" : "TIDE DN") : "TIDE --";
+    g.font="bold 7px monospace";
+    g.fillText(`HIGH ${highText}`,3,SH-30);
+    g.fillText(`LOW  ${lowText}`,3,SH-20);
+    g.fillText(tideText,82,SH-20);
+
+    // Detailed weather information belongs to I (auxiliary information).
+    const auxW=weatherInfo();
+    const auxPres=auxW.pressureMslHpa===null ? "----" : String(Math.round(auxW.pressureMslHpa));
+    const auxRain=auxW.precipitationProbabilityPct===null ? "--" : String(auxW.precipitationProbabilityPct);
+    g.fillText(`PRES ${auxPres}hPa`,232,23);
+    g.fillText(`RAIN ${auxRain}%`,232,33);
+
     let locText=(LOCATION.name||`${LOCATION.lat.toFixed(2)}, ${LOCATION.lon.toFixed(2)}`).toUpperCase();
     if(locText.length>34) locText=locText.slice(0,33)+"…";
     g.textAlign="left";
-    g.font="bold 7px monospace";
     g.fillText(locText,3,SH-10);
   }
 
@@ -1449,6 +1576,8 @@ function drawClockInfoOverlay(){
 
     const temp=w.temperatureC===null ? "--.-" : w.temperatureC.toFixed(1);
     const hum=w.humidityPct===null ? "--" : String(w.humidityPct);
+    const pres=w.pressureMslHpa===null ? "----" : String(Math.round(w.pressureMslHpa));
+    const rain=w.precipitationProbabilityPct===null ? "--" : String(w.precipitationProbabilityPct);
 
     g.font="bold 8px monospace";
     g.textAlign="left";
@@ -1669,8 +1798,10 @@ window.addEventListener("keydown",(ev)=>{
 
 loadSavedEphemeris();
 fetchCurrentWeather();
+fetchTides();
 fetchDailyEphemeris();
 setInterval(fetchCurrentWeather,30*60*1000);
+setInterval(serviceTides,60*1000);
 // Check often for a date rollover; failed ephemeris requests are rate-limited to hourly.
 setInterval(serviceDailyEphemeris,60*1000);
 
@@ -1683,13 +1814,17 @@ async function refreshEnvironmentForLocation(){
   // location's timezone first; then today's ephemeris is requested/evaluated in
   // that timezone. Finally force an immediate redraw so sky AND ground switch now.
   ENV.weather.mode="default"; ENV.weather.cloud=35;
-  ENV.weather.temperatureC=null; ENV.weather.humidityPct=null; ENV.weather.source="refreshing";
+  ENV.weather.temperatureC=null; ENV.weather.humidityPct=null;
+  ENV.weather.pressureMslHpa=null; ENV.weather.precipitationProbabilityPct=null;
+  ENV.weather.source="refreshing";
+  TIDE.valid=false; TIDE.rising=false; TIDE.nextHighEpoch=0; TIDE.nextLowEpoch=0; lastTideAttempt=0;
   ASTRO.dateKey=0; ASTRO.valid=false; lastEphemerisAttempt=0;
   await fetchCurrentWeather();
+  await fetchTides();
   await fetchDailyEphemeris();
 
   // Full LOCATION presentation refresh:
-  // date / weekday / time / weather / temperature / humidity / Sun / Moon /
+  // date / weekday / time / weather / temperature / humidity / pressure / rain / tide / Sun / Moon /
   // sky / ground / text contrast are all re-evaluated from the new location.
   draw();
 }
@@ -1746,6 +1881,6 @@ document.getElementById("useLocation").onclick=()=>{
   },err=>{setLocationStatus("ERROR"); alert("Location access failed: "+err.message);});
 };
 </script>
-<div style="position:fixed;left:12px;bottom:10px;font:12px monospace;color:#777;pointer-events:none">I: EXTRA INFO (SUN/MOON R/S + LOCATION)</div>
+<div style="position:fixed;left:12px;bottom:10px;font:12px monospace;color:#777;pointer-events:none">I: EXTRA INFO (SUN/MOON R/S + TIDE + PRES/RAIN + LOCATION)</div>
 </body>
 </html>
