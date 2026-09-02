@@ -621,7 +621,7 @@ function updateUfo(){
   if(UFO.phase==="enterLeft"){
     // Track the moving runner while approaching.
     UFO.targetX=p.x+5;
-    UFO.x+=2.0;
+    UFO.x+=0.4;
     if(UFO.x>=UFO.targetX){
       UFO.x=UFO.targetX;
       UFO.phase="hoverBeforeBeam";
@@ -642,8 +642,8 @@ function updateUfo(){
   }else if(UFO.phase==="beamGrow"){
     // Beam grows DOWNWARD from the saucer toward the current terrain.
     UFO.x=p.x+5;
-    UFO.beam=Math.min(1,UFO.beam+0.05);
-    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
+    UFO.beam=Math.min(1,UFO.beam+0.0055);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.0024);
     UFO.beamGroundY=groundAt(0,p.x+5);
 
     if(UFO.beamProgress>=1){
@@ -672,7 +672,7 @@ function updateUfo(){
     UFO.beamProgress=1;
     // Raised-arms/relaxed capture pose, lifted straight upward.
     p.x=UFO.x-5;
-    p.y-=1.15;
+    p.y-=0.145;
     if(p.y<UFO.y+8){
       UFO.phase="exitRight";
       UFO.phaseT=0;
@@ -681,7 +681,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="exitRight"){
-    UFO.x+=2.5;
+    UFO.x+=0.5;
     p.x=UFO.x-5;
     p.y=UFO.y+5;
     if(UFO.x>SW+38){
@@ -694,7 +694,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="returnRight"){
-    UFO.x-=2.2;
+    UFO.x-=0.45;
     UFO.targetX=132+5;
     if(UFO.x<=UFO.targetX){
       UFO.x=UFO.targetX;
@@ -705,7 +705,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="returnLeft"){
-    UFO.x+=2.2;
+    UFO.x+=0.45;
     UFO.targetX=132+5;
     if(UFO.x>=UFO.targetX){
       UFO.x=UFO.targetX;
@@ -717,8 +717,8 @@ function updateUfo(){
 
   }else if(UFO.phase==="dropBeamGrow"){
     // Delivery beam also grows down to the terrain first.
-    UFO.beam=Math.min(1,UFO.beam+0.05);
-    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
+    UFO.beam=Math.min(1,UFO.beam+0.0055);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.0024);
     UFO.beamGroundY=groundAt(0,UFO.x);
     if(UFO.beamProgress>=1){
       UFO.phase="drop";
@@ -733,7 +733,7 @@ function updateUfo(){
     UFO.beamProgress=1;
     p.x=UFO.x-5;
     const landing=groundAt(0,p.x+5)-11;
-    p.y=Math.min(landing,p.y+1.15);
+    p.y=Math.min(landing,p.y+0.145);
     UFO.beamGroundY=landing+11;
     if(p.y>=landing){
       p.y=landing;
@@ -745,7 +745,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="leaveLeft"){
-    UFO.x-=2.5;
+    UFO.x-=0.5;
     if(UFO.phaseT>12 && p.state==="ufoLanded"){
       p.state="run";
       p.targetX=132;
