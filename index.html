@@ -1,11 +1,11 @@
-<!-- SOUND TERRARIUM HTML v130: matches the current Cardputer information layout; hardware STEP remains Cardputer-ADV-only.\n  v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability.\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
+<!-- SOUND TERRARIUM HTML v131: matches the current Cardputer information layout; hardware STEP remains Cardputer-ADV-only.\n  v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability.\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
   v116: adds TIME/DATE button for visible clock-overlay control. -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SOUND TERRARIUM v130 — worldwide browser version</title>
+<title>SOUND TERRARIUM v131 — worldwide browser version</title>
 <style>
 body{margin:0;padding:16px;background:#111;color:#ddd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 h2{font-size:18px;margin:0 0 6px}
@@ -29,7 +29,7 @@ button{padding:7px 10px;background:#222;color:#fff;border:1px solid #666;border-
 <span class="meter" id="m">audio: demo</span>
 </div>
 <div class="row"><input id="city" placeholder="City: New York, London, Tokyo"><button id="setCity">LOCATION SET</button><button id="useLocation">USE CURRENT LOCATION</button><span class="meter" id="locLabel">Tokyo, Japan</span><span class="meter" id="locStatus"></span></div>
-<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, clock, weather and TEMP/HUM, I = show/hide SUN/MOON rise/set, tide, pressure, rain probability and LOCATION. The browser mirrors the Cardputer layout with AP: xxxxxxxx and STEP xxxx placeholders; no Wi-Fi AP state or BMI270 step count is simulated.</div>
+<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, weekday, clock and weather. I = show/hide detailed information and the 8-band EQ: SUN/MOON rise/set, tide, TEMP/HUM, pressure, rain probability, STEP/AP/LOCATION and BAT. The EQ continues to drive the terrain even while hidden. The browser mirrors hardware-only fields with STEP xxxx, AP: xxxxxxxx and BAT xx% placeholders; no BMI270 step count, Wi-Fi AP state or Cardputer battery state is simulated.</div>
 
 <script>
 const S={"jump":[["......b...",".....www..",".....www..","....www...","wwwwowww..","...bww..ww","....ww....","....wwwwww",".wwwwb....","..........",".........."]],"run":[["......b...",".....www..",".....www..","....www...","..wwowww..",".wwbww..ww","....ww....","....www...",".wwwwbww..","......ww..","......ww.."],["......b...",".....www..",".....www..",".....ww...","....www...","...wwwww..","...wwwwbww",".....www..","....wwww..","...www....","....ww...."],["......b...",".....www..",".....www..",".....ww...","...wwwwbb.","..wwowwww.",".....ww...","....wwww..","...ww..ww.","..ww...ww.","..ww......"]],"fall":[["ww..b..ww.","wwowwwoww.","wwowwwoww.",".wwwwwww..","...ww.....","...ww.....","...wwww...","...wwbww..","...wwbww..","...wwbww..","...ww....."]],"climb":[["....ww....","....ww...o","....wwwwww",".o..www...",".wwwwww...","....www...","....www...","...wwbww..","...wwbwww.","...ww.....","..www....."],["....ww....","b...ww....","wwwwww....","...www..b.","...wwwwww.","...www....","...www....","..wwoww...",".wwwoww...",".....ww...",".....www.."]],"wave":[["....ww.w..","...wwwww..","...wwww...","....ww....","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww..w.","...wwww.w.","...wwww.w.","....ww.w..","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww....","...wwww...","...wwww...","....ww....","...wwwwwww","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."]],"trip":[["..........","..........","......b...",".....www..","....wwww..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."],["..........","..........","..........","......b...",".....www..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."]]};
@@ -879,7 +879,7 @@ const TIDE = {
   nextLowEpoch:0
 };
 let showClockInfo=true;
-let showAuxInfo=false; // I: SUN/MOON R/S + TIDE + LOCATION; hidden by default
+let showAuxInfo=false; // I: detailed information + visible EQ; hidden by default
 
 function isoLocalMinutes(s){
   if(typeof s!=="string") return null;
@@ -1523,7 +1523,7 @@ function drawClockInfoOverlay(){
   if(!showClockInfo && !showAuxInfo) return;
 
   // T and I are deliberately independent:
-  // T = date/time/weather/TEMP/HUM, I = SUN/MOON schedule + TIDE + PRES/RAIN + LOCATION.
+  // T = date/weekday/time/weather only. I = detailed information + visible EQ.
   const c=clockInfo();
   const w=weatherInfo();
   const sky=skyColorForClock(c,w);
@@ -1570,13 +1570,22 @@ function drawClockInfoOverlay(){
     const auxW=weatherInfo();
     const auxPres=auxW.pressureMslHpa===null ? "----" : String(Math.round(auxW.pressureMslHpa));
     const auxRain=auxW.precipitationProbabilityPct===null ? "--" : String(auxW.precipitationProbabilityPct);
+    const auxTemp=auxW.temperatureC===null ? "--.-" : auxW.temperatureC.toFixed(1);
+    const auxHum=auxW.humidityPct===null ? "--" : String(auxW.humidityPct);
+    g.fillText(`TEMP ${auxTemp}C`,232,3);
+    g.fillText(`HUM  ${auxHum}%`,232,13);
     g.fillText(`PRES ${auxPres}hPa`,232,23);
     g.fillText(`RAIN ${auxRain}%`,232,33);
+
+    // Browser cannot read the Cardputer ADV battery; mirror its I-layout with a placeholder.
+    const eq=currentEqGeometry();
+    g.fillText("BAT xx%",eq.x0,SH-10);
 
     let locText=(LOCATION.name||`${LOCATION.lat.toFixed(2)}, ${LOCATION.lon.toFixed(2)}`).toUpperCase();
     if(locText.length>34) locText=locText.slice(0,33)+"…";
     g.textAlign="left";
-    // Browser has no Wi-Fi access-point state; keep the Cardputer layout with an explicit placeholder.
+    // Browser has no BMI270 or Wi-Fi AP state; preserve the Cardputer I-layout with explicit placeholders.
+    g.fillText("STEP xxxx",3,SH-30);
     g.fillText("AP: xxxxxxxx",3,SH-20);
     g.fillText(locText,3,SH-10);
   }
@@ -1588,20 +1597,6 @@ function drawClockInfoOverlay(){
     const days=["SUN","MON","TUE","WED","THU","FRI","SAT"];
     const dateText=yyyy+"."+mm+"."+dd+" "+days[c.now.getDay()];
     const timeText=String(c.h).padStart(2,"0")+":"+String(c.m).padStart(2,"0");
-
-    const temp=w.temperatureC===null ? "--.-" : w.temperatureC.toFixed(1);
-    const hum=w.humidityPct===null ? "--" : String(w.humidityPct);
-    const pres=w.pressureMslHpa===null ? "----" : String(Math.round(w.pressureMslHpa));
-    const rain=w.precipitationProbabilityPct===null ? "--" : String(w.precipitationProbabilityPct);
-
-    g.font="bold 8px monospace";
-    g.textAlign="left";
-    g.fillText(`TEMP ${temp}C`,232,3);
-    g.fillText(`HUM  ${hum}%`,232,13);
-
-    // Browser has no BMI270; preserve the Cardputer T-layout without inventing a step count.
-    const eq=currentEqGeometry();
-    g.fillText("STEP xxxx",eq.x0,SH-10);
 
     const retro=clockRetroPalette(c);
 
@@ -1701,8 +1696,8 @@ function draw(){
     sprite(S.climb[Math.floor((p.climbT||0)/4)%2],p.x,p.y);
   }
 
-  // Keep the eight-band EQ visible in the lower-right foreground.
-  drawVisibleEq(roadInk);
+  // I reveals the EQ visualization; its hidden values still generate the terrain.
+  if(showAuxInfo) drawVisibleEq(roadInk);
 
   drawUfo();
 
