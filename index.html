@@ -1,11 +1,11 @@
-<!-- SOUND TERRARIUM HTML v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability (T).\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
+<!-- SOUND TERRARIUM HTML v130: matches the current Cardputer information layout; hardware STEP remains Cardputer-ADV-only.\n  v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability.\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
   v116: adds TIME/DATE button for visible clock-overlay control. -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SOUND TERRARIUM v122 — worldwide browser version</title>
+<title>SOUND TERRARIUM v130 — worldwide browser version</title>
 <style>
 body{margin:0;padding:16px;background:#111;color:#ddd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 h2{font-size:18px;margin:0 0 6px}
@@ -19,7 +19,7 @@ button{padding:7px 10px;background:#222;color:#fff;border:1px solid #666;border-
 </head>
 <body>
 <h2>SOUND TERRARIUM</h2>
-<p><em>inspired by retro arcade</em><br>A tiny world where sound creates the terrain, while real-world time, weather, sunrise/sunset, and moonrise/moonset shape the sky.</p>
+<p><em>inspired by retro arcade</em><br>A tiny world where sound creates the terrain, while real-world time, weather, sunrise/sunset, and moonrise/moonset shape the sky.<br><strong>Small device. Small world. BONSAI Spirit.</strong></p>
 <canvas id="c" width="320" height="240"></canvas>
 <div class="row">
 <button id="share">START MICROPHONE</button>
@@ -29,7 +29,7 @@ button{padding:7px 10px;background:#222;color:#fff;border:1px solid #666;border-
 <span class="meter" id="m">audio: demo</span>
 </div>
 <div class="row"><input id="city" placeholder="City: New York, London, Tokyo"><button id="setCity">LOCATION SET</button><button id="useLocation">USE CURRENT LOCATION</button><span class="meter" id="locLabel">Tokyo, Japan</span><span class="meter" id="locStatus"></span></div>
-<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, clock, weather and TEMP/HUM, I = show/hide SUN/MOON rise/set, tide, pressure, rain probability and LOCATION.</div>
+<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, clock, weather and TEMP/HUM, I = show/hide SUN/MOON rise/set, tide, pressure, rain probability and LOCATION. The browser mirrors the Cardputer layout with AP: xxxxxxxx and STEP xxxx placeholders; no Wi-Fi AP state or BMI270 step count is simulated.</div>
 
 <script>
 const S={"jump":[["......b...",".....www..",".....www..","....www...","wwwwowww..","...bww..ww","....ww....","....wwwwww",".wwwwb....","..........",".........."]],"run":[["......b...",".....www..",".....www..","....www...","..wwowww..",".wwbww..ww","....ww....","....www...",".wwwwbww..","......ww..","......ww.."],["......b...",".....www..",".....www..",".....ww...","....www...","...wwwww..","...wwwwbww",".....www..","....wwww..","...www....","....ww...."],["......b...",".....www..",".....www..",".....ww...","...wwwwbb.","..wwowwww.",".....ww...","....wwww..","...ww..ww.","..ww...ww.","..ww......"]],"fall":[["ww..b..ww.","wwowwwoww.","wwowwwoww.",".wwwwwww..","...ww.....","...ww.....","...wwww...","...wwbww..","...wwbww..","...wwbww..","...ww....."]],"climb":[["....ww....","....ww...o","....wwwwww",".o..www...",".wwwwww...","....www...","....www...","...wwbww..","...wwbwww.","...ww.....","..www....."],["....ww....","b...ww....","wwwwww....","...www..b.","...wwwwww.","...www....","...www....","..wwoww...",".wwwoww...",".....ww...",".....www.."]],"wave":[["....ww.w..","...wwwww..","...wwww...","....ww....","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww..w.","...wwww.w.","...wwww.w.","....ww.w..","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww....","...wwww...","...wwww...","....ww....","...wwwwwww","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."]],"trip":[["..........","..........","......b...",".....www..","....wwww..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."],["..........","..........","..........","......b...",".....www..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."]]};
@@ -73,17 +73,10 @@ let bandFloor=new Array(8).fill(0.02);
 let bandCeil=new Array(8).fill(0.18);
 let adaptiveEqNorm=new Array(8).fill(0.20);
 let lastHourlyWaveKey="";
-
-const holes=[{x:250,w:14,nextDelay:420}];
-
 function worldAdvancePixels(){
   return globalBeat>0.42 ? 2 : 1;
 }
-function updateHoles(){ /* holes removed in SOUND TERRARIUM */
-}
 
-function holeAhead(i,p){ return false; }
-function overHole(i,p){ return false; }
 
 const people=[{
   x:132,y:157,state:"run",vy:0,waveT:0,climbT:0,climbPhase:"",climbStartX:0,climbTargetY:0,jumpT:0,jumpBaseY:0,
@@ -621,7 +614,7 @@ function updateUfo(){
   if(UFO.phase==="enterLeft"){
     // Track the moving runner while approaching.
     UFO.targetX=p.x+5;
-    UFO.x+=2.0;
+    UFO.x+=0.4;
     if(UFO.x>=UFO.targetX){
       UFO.x=UFO.targetX;
       UFO.phase="hoverBeforeBeam";
@@ -642,8 +635,8 @@ function updateUfo(){
   }else if(UFO.phase==="beamGrow"){
     // Beam grows DOWNWARD from the saucer toward the current terrain.
     UFO.x=p.x+5;
-    UFO.beam=Math.min(1,UFO.beam+0.05);
-    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
+    UFO.beam=Math.min(1,UFO.beam+0.0055);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.0024);
     UFO.beamGroundY=groundAt(0,p.x+5);
 
     if(UFO.beamProgress>=1){
@@ -672,7 +665,7 @@ function updateUfo(){
     UFO.beamProgress=1;
     // Raised-arms/relaxed capture pose, lifted straight upward.
     p.x=UFO.x-5;
-    p.y-=1.15;
+    p.y-=0.145;
     if(p.y<UFO.y+8){
       UFO.phase="exitRight";
       UFO.phaseT=0;
@@ -681,7 +674,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="exitRight"){
-    UFO.x+=2.5;
+    UFO.x+=0.5;
     p.x=UFO.x-5;
     p.y=UFO.y+5;
     if(UFO.x>SW+38){
@@ -694,7 +687,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="returnRight"){
-    UFO.x-=2.2;
+    UFO.x-=0.45;
     UFO.targetX=132+5;
     if(UFO.x<=UFO.targetX){
       UFO.x=UFO.targetX;
@@ -705,7 +698,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="returnLeft"){
-    UFO.x+=2.2;
+    UFO.x+=0.45;
     UFO.targetX=132+5;
     if(UFO.x>=UFO.targetX){
       UFO.x=UFO.targetX;
@@ -717,8 +710,8 @@ function updateUfo(){
 
   }else if(UFO.phase==="dropBeamGrow"){
     // Delivery beam also grows down to the terrain first.
-    UFO.beam=Math.min(1,UFO.beam+0.05);
-    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.022);
+    UFO.beam=Math.min(1,UFO.beam+0.0055);
+    UFO.beamProgress=Math.min(1,UFO.beamProgress+0.0024);
     UFO.beamGroundY=groundAt(0,UFO.x);
     if(UFO.beamProgress>=1){
       UFO.phase="drop";
@@ -733,7 +726,7 @@ function updateUfo(){
     UFO.beamProgress=1;
     p.x=UFO.x-5;
     const landing=groundAt(0,p.x+5)-11;
-    p.y=Math.min(landing,p.y+1.15);
+    p.y=Math.min(landing,p.y+0.145);
     UFO.beamGroundY=landing+11;
     if(p.y>=landing){
       p.y=landing;
@@ -745,7 +738,7 @@ function updateUfo(){
     }
 
   }else if(UFO.phase==="leaveLeft"){
-    UFO.x-=2.5;
+    UFO.x-=0.5;
     if(UFO.phaseT>12 && p.state==="ufoLanded"){
       p.state="run";
       p.targetX=132;
@@ -1547,11 +1540,31 @@ function drawClockInfoOverlay(){
 
     const highText=TIDE.valid ? fmtTideEpoch(TIDE.nextHighEpoch) : "--:--";
     const lowText=TIDE.valid ? fmtTideEpoch(TIDE.nextLowEpoch) : "--:--";
-    const tideText=TIDE.valid ? (TIDE.rising ? "TIDE UP" : "TIDE DN") : "TIDE --";
+    const tideArrow=TIDE.valid ? (TIDE.rising ? "↑" : "↓") : "–";
     g.font="bold 7px monospace";
-    g.fillText(`HIGH ${highText}`,3,SH-30);
-    g.fillText(`LOW  ${lowText}`,3,SH-20);
-    g.fillText(tideText,82,SH-20);
+
+    // Current Cardputer layout: H/L stacked below SUN/MOON.
+    g.fillText(`H${highText}`,43,23);
+    g.fillText(`L${lowText}`,43,33);
+    g.fillText(`TIDE${tideArrow}`,72,23);
+
+    // Three thin blue tide waves, matching the Cardputer ADV visual cue.
+    g.save();
+    g.strokeStyle="#0078ff";
+    g.lineWidth=1;
+    for(let row=0;row<3;row++){
+      const baseY=24+row*4;
+      g.beginPath();
+      for(let wave=0;wave<3;wave++){
+        const x0=3+wave*12;
+        g.moveTo(x0,baseY+2);
+        g.lineTo(x0+3,baseY);
+        g.lineTo(x0+6,baseY+2);
+        g.lineTo(x0+9,baseY);
+      }
+      g.stroke();
+    }
+    g.restore();
 
     // Detailed weather information belongs to I (auxiliary information).
     const auxW=weatherInfo();
@@ -1563,6 +1576,8 @@ function drawClockInfoOverlay(){
     let locText=(LOCATION.name||`${LOCATION.lat.toFixed(2)}, ${LOCATION.lon.toFixed(2)}`).toUpperCase();
     if(locText.length>34) locText=locText.slice(0,33)+"…";
     g.textAlign="left";
+    // Browser has no Wi-Fi access-point state; keep the Cardputer layout with an explicit placeholder.
+    g.fillText("AP: xxxxxxxx",3,SH-20);
     g.fillText(locText,3,SH-10);
   }
 
@@ -1583,6 +1598,10 @@ function drawClockInfoOverlay(){
     g.textAlign="left";
     g.fillText(`TEMP ${temp}C`,232,3);
     g.fillText(`HUM  ${hum}%`,232,13);
+
+    // Browser has no BMI270; preserve the Cardputer T-layout without inventing a step count.
+    const eq=currentEqGeometry();
+    g.fillText("STEP xxxx",eq.x0,SH-10);
 
     const retro=clockRetroPalette(c);
 
