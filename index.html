@@ -83,10 +83,22 @@ const people=[{
   nextWave:Infinity,targetX:132
 }];
 
+// Only white pixels respond to temperature; original accents stay unchanged.
+function runnerTemperatureColor(){
+  const t=ENV.weather.temperatureC;
+  if(!navigator.onLine || !ENV.weather.temperatureOnline || !Number.isFinite(t)) return "#fff";
+  if(t>=38) return "#ff0000";
+  if(t>=36) return "#ff8000";
+  if(t<=-20) return "#0000ff";
+  if(t<=-10) return "#80ccff";
+  return "#fff";
+}
+
 function sprite(rows,x,y){
+  const bodyColor=runnerTemperatureColor();
   x=Math.round(x);y=Math.round(y);
 
-  // 1px black silhouette around the exact 10x11 sprite.
+  // White outline only for the blue temperature tint at local night.
   // This improves readability on every colored band without changing the source sprite itself.
   const occupied=[];
   for(let yy=0;yy<rows.length;yy++){
@@ -94,7 +106,7 @@ function sprite(rows,x,y){
       if(rows[yy][xx]!==".") occupied.push([xx,yy]);
     }
   }
-  g.fillStyle="#000";
+  g.fillStyle=(bodyColor==="#0000ff" && !clockInfo().isDay) ? "#fff" : "#000";
   for(const [xx,yy] of occupied){
     for(let oy=-1;oy<=1;oy++){
       for(let ox=-1;ox<=1;ox++){
@@ -109,7 +121,7 @@ function sprite(rows,x,y){
     for(let xx=0;xx<rows[yy].length;xx++){
       const c=rows[yy][xx];
       if(c===".")continue;
-      g.fillStyle=c==="w"?"#fff":c==="o"?"#ff8c20":"#28a8ff";
+      g.fillStyle=c==="w"?bodyColor:c==="o"?"#ff8c20":"#28a8ff";
       g.fillRect(x+xx,y+yy,1,1);
     }
   }
@@ -840,6 +852,7 @@ const ENV = {
     cloud: 35,
     source: "fallback",
     temperatureC: null,
+    temperatureOnline: false,
     humidityPct: null,
     pressureMslHpa: null,
     precipitationProbabilityPct: null
@@ -1012,7 +1025,8 @@ async function fetchCurrentWeather(){
     if(!cur || !Number.isFinite(Number(cur.weather_code))) throw new Error("weather_code missing");
     ENV.weather.mode=modeFromWMO(Number(cur.weather_code));
     ENV.weather.cloud=Number.isFinite(Number(cur.cloud_cover)) ? Number(cur.cloud_cover) : 0;
-    ENV.weather.temperatureC=Number.isFinite(Number(cur.temperature_2m)) ? Number(cur.temperature_2m) : null;
+    ENV.weather.temperatureC=(typeof cur.temperature_2m==="number" && Number.isFinite(cur.temperature_2m)) ? cur.temperature_2m : null;
+    ENV.weather.temperatureOnline=navigator.onLine && ENV.weather.temperatureC!==null;
     ENV.weather.humidityPct=Number.isFinite(Number(cur.relative_humidity_2m)) ? Math.round(Number(cur.relative_humidity_2m)) : null;
     ENV.weather.pressureMslHpa=(cur.pressure_msl!==null && Number.isFinite(Number(cur.pressure_msl))) ? Number(cur.pressure_msl) : null;
     const popRaw=data && data.hourly && Array.isArray(data.hourly.precipitation_probability)
@@ -1023,6 +1037,7 @@ async function fetchCurrentWeather(){
     if(data.timezone){ LOCATION.timezone=data.timezone; saveLocation(); }
   }catch(err){
     console.warn("Weather fetch failed:",err);
+    ENV.weather.temperatureOnline=false;
   }
 }
 
@@ -1810,6 +1825,7 @@ window.addEventListener("keydown",(ev)=>{
 
 
 
+window.addEventListener("offline",()=>{ ENV.weather.temperatureOnline=false; });
 loadSavedEphemeris();
 fetchCurrentWeather();
 fetchTides();
@@ -1829,6 +1845,7 @@ async function refreshEnvironmentForLocation(){
   // that timezone. Finally force an immediate redraw so sky AND ground switch now.
   ENV.weather.mode="default"; ENV.weather.cloud=35;
   ENV.weather.temperatureC=null; ENV.weather.humidityPct=null;
+  ENV.weather.temperatureOnline=false;
   ENV.weather.pressureMslHpa=null; ENV.weather.precipitationProbabilityPct=null;
   ENV.weather.source="refreshing";
   TIDE.valid=false; TIDE.rising=false; TIDE.nextHighEpoch=0; TIDE.nextLowEpoch=0; lastTideAttempt=0;
