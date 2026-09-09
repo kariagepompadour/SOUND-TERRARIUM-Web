@@ -1,11 +1,11 @@
-<!-- SOUND TERRARIUM HTML v131: matches the current Cardputer information layout; hardware STEP remains Cardputer-ADV-only.\n  v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability.\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
+<!-- SOUND TERRARIUM HTML v136: keeps AP as an SSID field and uses AP: BROWSER when the browser cannot expose the network name.\n  v135: removes the obsolete fixed I-key hint and adds the runner message.\n  v134: restores BAT OK and replaces the unavailable browser SSID with online/offline status.\n  v133: separates browser-only controls from keyboard controls and removes duplicate action buttons.\n  v132: adds visible, clickable controls and Cardputer-ADV-only guidance.\n  v131: matches the current Cardputer information layout; hardware STEP remains Cardputer-ADV-only.\n  v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability.\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
   v116: adds TIME/DATE button for visible clock-overlay control. -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SOUND TERRARIUM v131 — worldwide browser version</title>
+<title>SOUND TERRARIUM v136 — worldwide browser version</title>
 <style>
 body{margin:0;padding:16px;background:#111;color:#ddd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 h2{font-size:18px;margin:0 0 6px}
@@ -15,21 +15,79 @@ canvas{display:block;width:320px;height:240px;background:#000;border:1px solid #
 button{padding:7px 10px;background:#222;color:#fff;border:1px solid #666;border-radius:6px} input{padding:7px;background:#181818;color:#fff;border:1px solid #666;border-radius:6px}
 .meter{font:11px monospace;color:#aaa}
 .note{font-size:11px;color:#888;margin-top:7px;max-width:760px}
+.runner-message{display:inline-block;margin-top:7px;color:#ddd;font-weight:600;line-height:1.5}
+.controls{margin-top:14px;max-width:760px;border:1px solid #444;border-radius:8px;padding:12px;background:#181818}
+.controls h3{font-size:13px;letter-spacing:.08em;margin:0 0 4px;color:#eee}
+.controls-intro{font-size:11px;color:#999;margin:0 0 9px}
+.web-control-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid #333}
+.web-control-row:first-of-type{border-top:0}
+.web-control-description{font-size:12px;color:#bbb;line-height:1.4}
+.web-only-tag{font-size:10px;color:#999;white-space:nowrap}
+.control-table{width:100%;border-collapse:collapse;font-size:12px}
+.control-table td{padding:5px 6px;border-top:1px solid #333;vertical-align:middle}
+.control-table td:first-child{width:58px;text-align:center}
+.keycap{min-width:38px;padding:4px 8px;border-radius:5px;background:#282828;border:1px solid #777;font:700 12px monospace;cursor:pointer}
+.keycap:hover,.keycap:focus-visible{background:#3a3a3a;border-color:#aaa}
+.hardware-only{color:#999}
+.hardware-tag{font-size:10px;color:#aaa;margin-left:6px}
+.motion{font-size:11px;line-height:1.55;color:#bbb;margin:11px 0 0;padding-top:10px;border-top:1px solid #444}
+.motion strong{color:#eee}
+dialog{max-width:360px;border:1px solid #777;border-radius:8px;background:#181818;color:#eee;padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.65)}
+dialog h3{font-size:15px;margin:0 0 9px}
+dialog p{font-size:12px;color:#bbb;margin:0 0 14px}
+dialog form{text-align:right}
+@media(max-width:600px){body{padding:10px}.controls{padding:10px}.control-table{font-size:11px}}
 </style>
 </head>
 <body>
 <h2>SOUND TERRARIUM</h2>
-<p><em>inspired by retro arcade</em><br>A tiny world where sound creates the terrain, while real-world time, weather, sunrise/sunset, and moonrise/moonset shape the sky.<br><strong>Small device. Small world. BONSAI Spirit.</strong></p>
+<p><em>inspired by retro arcade</em><br>A tiny world where sound creates the terrain, while real-world time, weather, sunrise/sunset, and moonrise/moonset shape the sky.<br><strong>Small device. Small world. BONSAI Spirit.</strong><br><span class="runner-message">The noise of the city is our energy.<br>Run toward tomorrow. Run! Run! Keep running!</span></p>
 <canvas id="c" width="320" height="240"></canvas>
-<div class="row">
+<div class="controls" aria-labelledby="webControlsTitle">
+<h3 id="webControlsTitle">WEB CONTROLS</h3>
+<p class="controls-intro">These controls are available only in the browser version.</p>
+<div class="web-control-row">
 <button id="share">START MICROPHONE</button>
-<button id="infoToggle">INFORMATION</button>
-<button id="clockToggle">TIME/DATE</button>
-<button id="ufoTest">UFO</button>
+<span class="web-control-description">Use sound from your browser's microphone to shape the terrain.</span>
 <span class="meter" id="m">audio: demo</span>
 </div>
-<div class="row"><input id="city" placeholder="City: New York, London, Tokyo"><button id="setCity">LOCATION SET</button><button id="useLocation">USE CURRENT LOCATION</button><span class="meter" id="locLabel">Tokyo, Japan</span><span class="meter" id="locStatus"></span></div>
-<div class="note">Press START MICROPHONE and allow microphone access in your browser. J = Jump, W = Wave, U = UFO, T = show/hide date, weekday, clock and weather. I = show/hide detailed information and the 8-band EQ: SUN/MOON rise/set, tide, TEMP/HUM, pressure, rain probability, STEP/AP/LOCATION and BAT. The EQ continues to drive the terrain even while hidden. The browser mirrors hardware-only fields with STEP xxxx, AP: xxxxxxxx and BAT xx% placeholders; no BMI270 step count, Wi-Fi AP state or Cardputer battery state is simulated.</div>
+<div class="web-control-row">
+<input id="city" placeholder="City: New York, London, Tokyo">
+<button id="setCity">LOCATION SET</button>
+<span class="web-control-description">Set the world using a city name.</span>
+</div>
+<div class="web-control-row">
+<button id="useLocation">USE CURRENT LOCATION</button>
+<span class="web-control-description">Use this device's current location.</span>
+<span class="meter" id="locLabel">Tokyo, Japan</span><span class="meter" id="locStatus"></span>
+</div>
+</div>
+<div class="controls" aria-labelledby="controlsTitle">
+<h3 id="controlsTitle">KEYBOARD &amp; TOUCH CONTROLS</h3>
+<p class="controls-intro">On a computer, press a key or click a button. On an iPhone or Android phone, tap a button below.</p>
+<table class="control-table">
+<tbody>
+<tr><td><button class="keycap" type="button" data-control="j">J</button></td><td>Jump</td></tr>
+<tr><td><button class="keycap" type="button" data-control="w">W</button></td><td>Wave</td></tr>
+<tr><td><button class="keycap" type="button" data-control="u">U</button></td><td>UFO event</td></tr>
+<tr><td><button class="keycap" type="button" data-control="t">T</button></td><td>Show / hide date, weekday, clock and weather</td></tr>
+<tr><td><button class="keycap" type="button" data-control="i">I</button></td><td>Show / hide detailed information and the 8-band EQ</td></tr>
+<tr class="hardware-only"><td><button class="keycap" type="button" data-control="c">C</button></td><td>Hold for 3 seconds to reset STEP <span class="hardware-tag">Cardputer ADV only</span></td></tr>
+<tr class="hardware-only"><td><button class="keycap" type="button" data-control="s">S</button></td><td>Open Wi-Fi SETUP <span class="hardware-tag">Cardputer ADV only</span></td></tr>
+</tbody>
+</table>
+<p class="motion"><strong>Cardputer ADV motion control</strong><br>
+Sound from the built-in microphone continuously shapes the terrain. Tilting the device left or right also tilts the terrain.<br>
+Device tilt control is available only on the Cardputer ADV version.</p>
+</div>
+<div class="note">Press START MICROPHONE and allow microphone access in your browser. The EQ continues to drive the terrain even while hidden. The browser shows STEP xxxx as a placeholder, AP: BROWSER because browsers cannot read the connected Wi-Fi name, and BAT OK because the Cardputer battery percentage is unavailable. On Cardputer ADV, the AP field displays the connected Wi-Fi access point name.</div>
+
+<dialog id="hardwareOnlyDialog">
+<h3>Cardputer ADV only</h3>
+<p id="hardwareOnlyMessage"></p>
+<form method="dialog"><button type="submit">CLOSE</button></form>
+</dialog>
 
 <script>
 const S={"jump":[["......b...",".....www..",".....www..","....www...","wwwwowww..","...bww..ww","....ww....","....wwwwww",".wwwwb....","..........",".........."]],"run":[["......b...",".....www..",".....www..","....www...","..wwowww..",".wwbww..ww","....ww....","....www...",".wwwwbww..","......ww..","......ww.."],["......b...",".....www..",".....www..",".....ww...","....www...","...wwwww..","...wwwwbww",".....www..","....wwww..","...www....","....ww...."],["......b...",".....www..",".....www..",".....ww...","...wwwwbb.","..wwowwww.",".....ww...","....wwww..","...ww..ww.","..ww...ww.","..ww......"]],"fall":[["ww..b..ww.","wwowwwoww.","wwowwwoww.",".wwwwwww..","...ww.....","...ww.....","...wwww...","...wwbww..","...wwbww..","...wwbww..","...ww....."]],"climb":[["....ww....","....ww...o","....wwwwww",".o..www...",".wwwwww...","....www...","....www...","...wwbww..","...wwbwww.","...ww.....","..www....."],["....ww....","b...ww....","wwwwww....","...www..b.","...wwwwww.","...www....","...www....","..wwoww...",".wwwoww...",".....ww...",".....www.."]],"wave":[["....ww.w..","...wwwww..","...wwww...","....ww....","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww..w.","...wwww.w.","...wwww.w.","....ww.w..","...wwww...","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."],["....ww....","...wwww...","...wwww...","....ww....","...wwwwwww","..wwww....","....ww....","....ww....","...wwww...","...w..w...","..ww..ww.."]],"trip":[["..........","..........","......b...",".....www..","....wwww..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."],["..........","..........","..........","......b...",".....www..","...wwwww..","wwwwbwwwww","wwwwwwwwww","..........","..........",".........."]]};
@@ -1592,16 +1650,16 @@ function drawClockInfoOverlay(){
     g.fillText(`PRES ${auxPres}hPa`,232,23);
     g.fillText(`RAIN ${auxRain}%`,232,33);
 
-    // Browser cannot read the Cardputer ADV battery; mirror its I-layout with a placeholder.
+    // Browser cannot read the Cardputer ADV battery percentage.
     const eq=currentEqGeometry();
-    g.fillText("BAT xx%",eq.x0,SH-10);
+    g.fillText("BAT OK",eq.x0,SH-10);
 
     let locText=(LOCATION.name||`${LOCATION.lat.toFixed(2)}, ${LOCATION.lon.toFixed(2)}`).toUpperCase();
     if(locText.length>34) locText=locText.slice(0,33)+"…";
     g.textAlign="left";
-    // Browser has no BMI270 or Wi-Fi AP state; preserve the Cardputer I-layout with explicit placeholders.
+    // Browser has no BMI270 step count and cannot read the connected Wi-Fi SSID.
     g.fillText("STEP xxxx",3,SH-30);
-    g.fillText("AP: xxxxxxxx",3,SH-20);
+    g.fillText("AP: BROWSER",3,SH-20);
     g.fillText(locText,3,SH-10);
   }
 
@@ -1784,21 +1842,19 @@ document.getElementById("share").addEventListener("click",async()=>{
   }
 });
 
-document.getElementById("infoToggle").onclick=()=>{
-  showAuxInfo=!showAuxInfo;
-};
+const hardwareOnlyDialog=document.getElementById("hardwareOnlyDialog");
+const hardwareOnlyMessage=document.getElementById("hardwareOnlyMessage");
 
-document.getElementById("clockToggle").onclick=()=>{
-  showClockInfo=!showClockInfo;
-};
+function showHardwareOnly(message){
+  hardwareOnlyMessage.textContent=message;
+  if(typeof hardwareOnlyDialog.showModal==="function"){
+    if(!hardwareOnlyDialog.open) hardwareOnlyDialog.showModal();
+  }else{
+    alert(message);
+  }
+}
 
-document.getElementById("ufoTest").addEventListener("click",()=>{
-  startUfoShift();
-});
-
-window.addEventListener("keydown",(ev)=>{
-  if(ev.repeat) return;
-  const k=ev.key.toLowerCase();
+function runControl(k){
   if(k==="j"){
     const p=people[0];
     if(!UFO.active && p.state==="run"){
@@ -1820,7 +1876,22 @@ window.addEventListener("keydown",(ev)=>{
     showClockInfo=!showClockInfo;
   }else if(k==="i"){
     showAuxInfo=!showAuxInfo;
+  }else if(k==="c"){
+    showHardwareOnly("STEP reset uses the Cardputer ADV motion sensor and is not available in the browser version.");
+  }else if(k==="s"){
+    showHardwareOnly("Wi-Fi setup is available only on the Cardputer ADV version. The browser version uses your device's current internet connection.");
   }
+}
+
+document.querySelectorAll("[data-control]").forEach(button=>{
+  button.addEventListener("click",()=>runControl(button.dataset.control));
+});
+
+window.addEventListener("keydown",(ev)=>{
+  if(ev.repeat) return;
+  if(ev.ctrlKey||ev.metaKey||ev.altKey) return;
+  if(ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLSelectElement) return;
+  runControl(ev.key.toLowerCase());
 });
 
 
@@ -1912,6 +1983,5 @@ document.getElementById("useLocation").onclick=()=>{
   },err=>{setLocationStatus("ERROR"); alert("Location access failed: "+err.message);});
 };
 </script>
-<div style="position:fixed;left:12px;bottom:10px;font:12px monospace;color:#777;pointer-events:none">I: EXTRA INFO (SUN/MOON R/S + TIDE + PRES/RAIN + LOCATION)</div>
 </body>
 </html>
