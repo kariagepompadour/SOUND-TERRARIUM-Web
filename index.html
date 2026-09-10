@@ -1,16 +1,16 @@
-<!-- SOUND TERRARIUM HTML v136: keeps AP as an SSID field and uses AP: BROWSER when the browser cannot expose the network name.\n  v135: removes the obsolete fixed I-key hint and adds the runner message.\n  v134: restores BAT OK and replaces the unavailable browser SSID with online/offline status.\n  v133: separates browser-only controls from keyboard controls and removes duplicate action buttons.\n  v132: adds visible, clickable controls and Cardputer-ADV-only guidance.\n  v131: matches the current Cardputer information layout; hardware STEP remains Cardputer-ADV-only.\n  v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability.\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
+<!-- SOUND TERRARIUM HTML v137: adds refined Sun/Moon overlap, simplified eclipse visuals, and yellow meteor-shower nights.\n  v136: keeps AP as an SSID field and uses AP: BROWSER when the browser cannot expose the network name.\n  v135: removes the obsolete fixed I-key hint and adds the runner message.\n  v134: restores BAT OK and replaces the unavailable browser SSID with online/offline status.\n  v133: separates browser-only controls from keyboard controls and removes duplicate action buttons.\n  v132: adds visible, clickable controls and Cardputer-ADV-only guidance.\n  v131: matches the current Cardputer information layout; hardware STEP remains Cardputer-ADV-only.\n  v122: adds tide HIGH/LOW + TIDE UP/DN (I), MSL pressure and precipitation probability.\n  v120: adds 5-second directional UFO rescue: the UFO returns from the same side where the runner disappeared.\n  v117: moves LOCATION to bottom-left and adds retro colored/twinkling stars while preserving T/I independence.
   v116: adds TIME/DATE button for visible clock-overlay control. -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SOUND TERRARIUM v136 — worldwide browser version</title>
+<title>SOUND TERRARIUM v137 — worldwide browser version</title>
 <style>
 body{margin:0;padding:16px;background:#111;color:#ddd;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 h2{font-size:18px;margin:0 0 6px}
 p{font-size:12px;color:#aaa;line-height:1.55;max-width:760px}
-canvas{display:block;width:320px;height:240px;background:#000;border:1px solid #555;image-rendering:pixelated}
+canvas{display:block;width:480px;max-width:calc(100% - 2px);height:auto;aspect-ratio:16/9;background:#000;border:1px solid #555;image-rendering:pixelated}
 .row{margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 button{padding:7px 10px;background:#222;color:#fff;border:1px solid #666;border-radius:6px} input{padding:7px;background:#181818;color:#fff;border:1px solid #666;border-radius:6px}
 .meter{font:11px monospace;color:#aaa}
@@ -43,7 +43,7 @@ dialog form{text-align:right}
 <body>
 <h2>SOUND TERRARIUM</h2>
 <p><em>inspired by retro arcade</em><br>A tiny world where sound creates the terrain, while real-world time, weather, sunrise/sunset, and moonrise/moonset shape the sky.<br><strong>Small device. Small world. BONSAI Spirit.</strong><br><span class="runner-message">The noise of the city is our energy.<br>Run toward tomorrow. Run! Run! Keep running!</span></p>
-<canvas id="c" width="320" height="240"></canvas>
+<canvas id="c" width="240" height="135"></canvas>
 <div class="controls" aria-labelledby="webControlsTitle">
 <h3 id="webControlsTitle">WEB CONTROLS</h3>
 <p class="controls-intro">These controls are available only in the browser version.</p>
@@ -94,7 +94,7 @@ const S={"jump":[["......b...",".....www..",".....www..","....www...","wwwwowww.
 const c=document.getElementById("c"),g=c.getContext("2d");
 g.imageSmoothingEnabled=false;
 
-const SW=320, SH=240, N=1, laneH=240;
+const SW=240, SH=135, N=1, laneH=135;
 function earthArc(x){
   const u=(x-(SW-1)/2)/((SW-1)/2);
   return -2 + 3*u*u;
@@ -118,7 +118,7 @@ let audioCtx=null, analyser=null, freq=null, sharedStream=null;
 let demoMode=true, tick=0, last=0;
 let terrainAccumulator=0;
 
-const histories=[new Array(SW+24).fill(168)];
+const histories=[new Array(SW+24).fill(108)];
 const bands=[0], smooth=[0], prevBands=[0], beatPulse=[0], bandCooldown=[0];
 const phases=[0], stepPulse=[0], runFrame=[0], lastStepTick=[-999];
 let globalBeat=0, runBeatBoost=0;
@@ -137,8 +137,8 @@ function worldAdvancePixels(){
 
 
 const people=[{
-  x:132,y:157,state:"run",vy:0,waveT:0,climbT:0,climbPhase:"",climbStartX:0,climbTargetY:0,jumpT:0,jumpBaseY:0,
-  nextWave:Infinity,targetX:132
+  x:72,y:97,state:"run",vy:0,waveT:0,climbT:0,climbPhase:"",climbStartX:0,climbTargetY:0,jumpT:0,jumpBaseY:0,
+  nextWave:Infinity,targetX:72
 }];
 
 // Only white pixels respond to temperature; original accents stay unchanged.
@@ -283,16 +283,15 @@ function updateAdaptiveEqNorm(){
 }
 
 function currentEqGeometry(){
-  // Direct proportional port of Cardputer v104:
-  // Cardputer v104 uses horizonY=122, minH=6, maxH=27.
-  // HTML keeps the same proportions at 320×240.
-  const barW=7, gap=2, count=8;
-  const right=SW-4;
+  // Direct match to Cardputer v104/v108bx at the real 240×135 resolution:
+  // barW=5, gap=2, horizonY=122, minH=6, maxH=27 (EQ_GEN_* constants).
+  const barW=5, gap=2, count=8;
+  const right=SW-3;
   const total=count*barW+(count-1)*gap;
   const x0=right-total;
-  const horizonY=SH-23;
-  const minH=11;
-  const maxH=48;
+  const horizonY=122;
+  const minH=6;
+  const maxH=27;
 
   const tops=new Array(count);
   const centers=new Array(count);
@@ -610,7 +609,7 @@ function updatePerson(i){
 const UFO={
   active:false,
   phase:"idle",
-  x:-34,y:30,
+  x:-30,y:23,
   targetX:0,
   phaseT:0,
   beam:0,          // beam opacity/intensity
@@ -633,8 +632,8 @@ function startUfoShift(){
   const p=people[0];
   UFO.active=true;
   UFO.phase="enterLeft";
-  UFO.x=-34;
-  UFO.y=31;
+  UFO.x=-30;
+  UFO.y=23;
   UFO.targetX=p.x+5;
   UFO.phaseT=0;
   UFO.beam=0;
@@ -654,9 +653,9 @@ function startLostRunnerRescue(){
 
   UFO.active=true;
   UFO.phase=(lostSide<0)?"returnLeft":"returnRight";
-  UFO.x=(lostSide<0)?-38:SW+38;
-  UFO.y=31;
-  UFO.targetX=132+5;
+  UFO.x=(lostSide<0)?-30:SW+30;
+  UFO.y=23;
+  UFO.targetX=77;
   UFO.phaseT=0;
   UFO.beam=0;
   UFO.beamProgress=0;
@@ -747,10 +746,10 @@ function updateUfo(){
     UFO.x+=0.5;
     p.x=UFO.x-5;
     p.y=UFO.y+5;
-    if(UFO.x>SW+38){
+    if(UFO.x>SW+30){
       UFO.phase="returnRight";
-      UFO.x=SW+38;
-      UFO.y=31;
+      UFO.x=SW+30;
+      UFO.y=23;
       UFO.phaseT=0;
       p.x=SW+40;
       p.y=-30;
@@ -758,7 +757,7 @@ function updateUfo(){
 
   }else if(UFO.phase==="returnRight"){
     UFO.x-=0.45;
-    UFO.targetX=132+5;
+    UFO.targetX=77;
     if(UFO.x<=UFO.targetX){
       UFO.x=UFO.targetX;
       UFO.phase="dropBeamGrow";
@@ -769,7 +768,7 @@ function updateUfo(){
 
   }else if(UFO.phase==="returnLeft"){
     UFO.x+=0.45;
-    UFO.targetX=132+5;
+    UFO.targetX=77;
     if(UFO.x>=UFO.targetX){
       UFO.x=UFO.targetX;
       UFO.phase="dropBeamGrow";
@@ -811,9 +810,9 @@ function updateUfo(){
     UFO.x-=0.5;
     if(UFO.phaseT>12 && p.state==="ufoLanded"){
       p.state="run";
-      p.targetX=132;
+      p.targetX=72;
     }
-    if(UFO.x<-38){
+    if(UFO.x<-30){
       UFO.active=false;
       UFO.phase="idle";
       UFO.phaseT=0;
@@ -826,36 +825,36 @@ function drawUfo(){
   const x=Math.round(UFO.x), y=Math.round(UFO.y);
 
   // Tractor beam: starts narrow under the saucer and grows DOWN to the terrain.
+  // Matches Cardputer v108bx proportions (sy=y+4, half=4+9*progress).
   if(UFO.beam>0 && UFO.beamProgress>0){
-    const startY=y+5;
+    const startY=y+4;
     const fullGround=Math.max(startY+1, UFO.beamGroundY);
     const endY=startY+(fullGround-startY)*UFO.beamProgress;
-    const fullHalf=16;
-    const endHalf=5+(fullHalf-5)*UFO.beamProgress;
+    const endHalf=4+9*UFO.beamProgress;
 
     g.save();
     g.globalAlpha=0.18+UFO.beam*0.34;
-    g.fillStyle="#39ff72";
+    g.fillStyle="#bdff3a";
     g.beginPath();
-    g.moveTo(x-6,startY);
-    g.lineTo(x+6,startY);
+    g.moveTo(x-5,startY);
+    g.lineTo(x+5,startY);
     g.lineTo(x+endHalf,endY);
     g.lineTo(x-endHalf,endY);
     g.closePath();
     g.fill();
 
     g.globalAlpha=0.96;
-    g.strokeStyle="#7dff57";
+    g.strokeStyle="#7bff52";
     g.lineWidth=1;
     g.beginPath();
-    g.moveTo(x-6,startY); g.lineTo(x-endHalf,endY);
-    g.moveTo(x+6,startY); g.lineTo(x+endHalf,endY);
+    g.moveTo(x-5,startY); g.lineTo(x-endHalf,endY);
+    g.moveTo(x+5,startY); g.lineTo(x+endHalf,endY);
     g.stroke();
 
     // Bright contact line only when the beam has reached the ground.
     if(UFO.beamProgress>=0.999){
       g.globalAlpha=1.0;
-      g.strokeStyle="#eaff75";
+      g.strokeStyle="#efff52";
       g.beginPath();
       g.moveTo(x-endHalf,endY);
       g.lineTo(x+endHalf,endY);
@@ -864,28 +863,28 @@ function drawUfo(){
     g.restore();
   }
 
-  // Original compact 70s/80s arcade saucer.
+  // Original compact 70s/80s arcade saucer. Matches Cardputer v108bx sizing.
   g.save();
-  g.fillStyle="#d8d8d8";
-  g.strokeStyle="#111";
+  g.fillStyle="#d6d2d6";
+  g.strokeStyle="#000";
   g.lineWidth=1;
   g.beginPath();
-  g.ellipse(x,y,15,5,0,0,Math.PI*2);
+  g.ellipse(x,y,13,4,0,0,Math.PI*2);
   g.fill(); g.stroke();
 
-  g.fillStyle="#7dd7e8";
+  g.fillStyle="#7bdbf7";
   g.beginPath();
-  g.ellipse(x,y-4,7,5,0,Math.PI,Math.PI*2);
+  g.ellipse(x,y-3,6,4,0,Math.PI,Math.PI*2);
   g.fill(); g.stroke();
 
-  g.fillStyle="#f1f1f1";
-  g.fillRect(x-11,y-1,22,3);
-  g.strokeRect(x-11,y-1,22,3);
+  g.fillStyle="#efefef";
+  g.fillRect(x-10,y-1,20,3);
+  g.strokeRect(x-10,y-1,20,3);
 
   const blink=Math.floor(performance.now()/180)%2;
-  for(let i=-8;i<=8;i+=8){
-    g.fillStyle=blink ? "#fff3a0" : "#ff7b45";
-    g.fillRect(x+i-1,y+3,3,2);
+  for(const i of [-8,-1,6]){
+    g.fillStyle=blink ? "#ffff00" : "#ff4542";
+    g.fillRect(x+i,y+3,2,2);
   }
   g.restore();
 }
@@ -1014,12 +1013,12 @@ function moonVisibilityFromSun(m){
 }
 function celestialXYForPhase(phase){
   phase=Math.max(0,Math.min(1,phase));
-  const R=11;
+  const R=9;
   // At sunrise the Sun disk is already visible at the left edge;
-  // at sunset it reaches the right edge. Keep the existing low arc.
+  // at sunset it reaches the right edge. Matches Cardputer v108bx exactly.
   const x=R + (SW-2*R)*phase;
-  const horizonY=112;
-  const ry=76;
+  const horizonY=62;
+  const ry=42;
   return {x, y:horizonY-ry*Math.sin(Math.PI*phase)};
 }
 
@@ -1281,36 +1280,35 @@ function cloudColorForSky(storm=false){
   const dayMix=Math.max(0,Math.min(1,daylightStrength(minuteOfDay(safeNow()))));
   let base=42 + dayMix*174;
   if(storm) base=Math.max(24,Math.min(180,base-28));
-  return `rgb(${Math.round(base)},${Math.round(Math.min(255,base+2))},${Math.round(Math.min(255,base+7))})`;
+  const r=Math.round(base), g=Math.round(Math.min(255,base+2)), b=Math.round(Math.min(255,base+7));
+  return {r,g,b};
 }
-function drawCloudShape(x,y,s,color){
-  g.fillStyle=color;
-  g.beginPath();
-  g.arc(x,y,7*s,0,Math.PI*2);
-  g.arc(x+8*s,y-3*s,9*s,0,Math.PI*2);
-  g.arc(x+17*s,y,7*s,0,Math.PI*2);
-  g.fill();
-  g.fillRect(x,y,17*s,7*s);
-}
-function drawCloud(x,y,s=1,storm=false){
-  // Gray silhouette around the cloud keeps it visible when the daylight-driven
-  // cloud fill becomes close to the CLOUDY sky color.
-  const outline=storm ? "#59636b" : "#7b858d";
-  const o=Math.max(1,1.35*s);
-  drawCloudShape(x-o,y,s,outline);
-  drawCloudShape(x+o,y,s,outline);
-  drawCloudShape(x,y-o,s,outline);
-  drawCloudShape(x,y+o,s,outline);
-  drawCloudShape(x,y,s,cloudColorForSky(storm));
+function drawCloud(x,y,storm=false){
+  // Matches Cardputer v108bx cloud shape (3 lobes + connecting rect, fixed size).
+  // The edge color is the body color brightened by 18 per channel, same as firmware.
+  const bc=cloudColorForSky(storm);
+  const body=`rgb(${bc.r},${bc.g},${bc.b})`;
+  const outline=`rgb(${Math.min(255,bc.r+18)},${Math.min(255,bc.g+18)},${Math.min(255,bc.b+18)})`;
+  const lobe=(cx,cy,color)=>{
+    g.fillStyle=color;
+    g.beginPath();
+    g.arc(cx,cy,4,0,Math.PI*2);
+    g.arc(cx+5,cy-2,5,0,Math.PI*2);
+    g.arc(cx+10,cy,4,0,Math.PI*2);
+    g.fill();
+    g.fillRect(cx,cy,11,5);
+  };
+  lobe(x+1,y+1,outline);
+  lobe(x,y,body);
 }
 
 function drawSunFace(cx,cy){
-  // Refined at the actual runtime size: 22px diameter.
-  const R=11, ink="#5a4527", face="#f3d58a";
+  // Matches Cardputer v108bx exactly: 18px diameter.
+  const R=9, ink="#424121", face="#f7d76b";
   g.save(); g.lineWidth=1; g.strokeStyle=ink; g.fillStyle=face;
 
   for(let i=0;i<24;i++){
-    const a=i*Math.PI/12, r1=R+2, r2=R+(i%2===0?8:5);
+    const a=i*Math.PI/12, r1=9, r2=(i%2===0?16:13);
     g.beginPath();
     g.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
     g.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);
@@ -1318,57 +1316,101 @@ function drawSunFace(cx,cy){
   }
   g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.fill(); g.stroke();
 
-  // Brows + eyes
-  g.beginPath();
-  g.moveTo(cx-7,cy-4); g.quadraticCurveTo(cx-4,cy-6,cx-1,cy-4);
-  g.moveTo(cx+1,cy-4); g.quadraticCurveTo(cx+4,cy-6,cx+7,cy-4);
-  g.stroke();
-  for(const s of [-1,1]){
-    const ex=cx+s*4;
-    g.beginPath();
-    g.moveTo(ex-2,cy-2); g.quadraticCurveTo(ex,cy-4,ex+2,cy-2);
-    g.quadraticCurveTo(ex,cy,ex-2,cy-2); g.stroke();
-    g.fillStyle=ink; g.fillRect(Math.round(ex),Math.round(cy-2),1,1);
-  }
+  // Brows + eyes + nose + lips + chin: matches Cardputer v108bx line-for-line.
+  const seg=(x1,y1,x2,y2)=>{ g.beginPath(); g.moveTo(cx+x1,cy+y1); g.lineTo(cx+x2,cy+y2); g.stroke(); };
+  const dot=(x,y)=>{ g.fillStyle=ink; g.fillRect(cx+x,cy+y,1,1); g.fillStyle=face; };
 
-  // Nose
-  g.beginPath();
-  g.moveTo(cx,cy-1);
-  g.quadraticCurveTo(cx-1,cy+2,cx-1,cy+3);
-  g.quadraticCurveTo(cx,cy+4,cx+2,cy+3);
-  g.stroke();
+  seg(-6,-4,-4,-5); seg(-4,-5,-2,-4);
+  seg(2,-4,4,-5); seg(4,-5,6,-4);
+  seg(-6,-2,-4,-3); seg(-4,-3,-2,-2); dot(-4,-2);
+  seg(2,-2,4,-3); seg(4,-3,6,-2); dot(4,-2);
 
-  // Philtrum, small separated lips, chin.
-  g.beginPath(); g.moveTo(cx,cy+4); g.lineTo(cx,cy+5); g.stroke();
-  g.beginPath();
-  g.moveTo(cx-3,cy+6);
-  g.quadraticCurveTo(cx-1,cy+5,cx,cy+6);
-  g.quadraticCurveTo(cx+1,cy+5,cx+3,cy+6);
-  g.stroke();
-  g.beginPath();
-  g.moveTo(cx-2,cy+7); g.quadraticCurveTo(cx,cy+8,cx+2,cy+7); g.stroke();
-  g.beginPath();
-  g.moveTo(cx-2,cy+9); g.quadraticCurveTo(cx,cy+10,cx+2,cy+9); g.stroke();
+  seg(0,-1,-1,2); seg(-1,2,0,3); seg(0,3,2,2);
+
+  dot(0,4);
+
+  seg(-2,5,0,4); seg(0,4,2,5);
+  seg(-2,6,0,7); seg(0,7,2,6);
+
+  seg(-1,8,1,8);
 
   g.restore();
 }
 
 
-function lunarPhase01(dateObj=new Date()){
-  // 0=new moon, 0.25=first quarter, 0.5=full, 0.75=last quarter.
-  const SYNODIC_DAYS=29.530588853;
-  const REF_NEW_MOON_JD=2451550.25972; // 2000-01-06 18:14 UTC
-  const UNIX_JD=2440587.5;
-  const jd=UNIX_JD + dateObj.getTime()/86400000;
-  let p=((jd-REF_NEW_MOON_JD)/SYNODIC_DAYS)%1;
-  if(p<0) p+=1;
-  return p;
+function normDegrees(a){
+  a%=360;
+  return a<0?a+360:a;
 }
 
-function drawMoonFace(cx,cy,sky){
-  // Same refined face proportions as the Sun, with astronomical lunar illumination.
-  const R=11, face="#f3d04f", ink="#5a4527", darkMoon="#4f5666";
-  const phase=lunarPhase01(safeNow());
+let lunarGeometryCachedAt=0;
+let lunarGeometryCached={elongationDeg:0,latitudeDeg:0};
+function currentLunarGeometry(){
+  const nowMs=Date.now();
+  if(lunarGeometryCachedAt && nowMs-lunarGeometryCachedAt<30000) return lunarGeometryCached;
+  lunarGeometryCachedAt=nowMs;
+
+  const jd=2440587.5+nowMs/86400000;
+  const T=(jd-2451545.0)/36525.0;
+  const D =normDegrees(297.8501921+445267.1114034*T);
+  const M =normDegrees(357.5291092+ 35999.0502909*T);
+  const Mp=normDegrees(134.9633964+477198.8675055*T);
+  const F =normDegrees( 93.2720950+483202.0175233*T);
+  const r=Math.PI/180;
+
+  let e=D+6.289*Math.sin(Mp*r)+1.274*Math.sin((2*D-Mp)*r)-1.9146*Math.sin(M*r);
+  const moonLat=5.128*Math.sin(F*r)+0.280*Math.sin((Mp+F)*r)+0.277*Math.sin((Mp-F)*r);
+  e=normDegrees(e);
+  if(e>180) e-=360;
+  lunarGeometryCached={elongationDeg:e,latitudeDeg:moonLat};
+  return lunarGeometryCached;
+}
+
+function lunarPhase01(){
+  const e=currentLunarGeometry().elongationDeg;
+  return (e<0?e+360:e)/360;
+}
+
+function eclipseVisualNow(){
+  const lunar=currentLunarGeometry();
+  const ae=Math.abs(lunar.elongationDeg),ab=Math.abs(lunar.latitudeDeg);
+  const visual={solar:false,solarProgress:0,lunarStrength:0};
+  if(ae<1.8 && ab<1.45){
+    visual.solar=true;
+    visual.solarProgress=lunar.elongationDeg/1.8;
+  }
+  const fullSep=Math.abs(180-ae);
+  if(fullSep<2.8 && ab<1.30){
+    visual.lunarStrength=(1-fullSep/2.8)*(1-0.50*ab/1.30);
+  }
+  return visual;
+}
+
+function mixHexColor(a,b,t){
+  t=Math.max(0,Math.min(1,t));
+  const av=parseInt(a.slice(1),16),bv=parseInt(b.slice(1),16);
+  const ar=(av>>16)&255,ag=(av>>8)&255,ab=av&255;
+  const br=(bv>>16)&255,bg=(bv>>8)&255,bb=bv&255;
+  return `rgb(${Math.round(ar+(br-ar)*t)},${Math.round(ag+(bg-ag)*t)},${Math.round(ab+(bb-ab)*t)})`;
+}
+
+function drawSolarEclipseMask(cx,cy,eclipse){
+  const x=cx+Math.round(eclipse.solarProgress*18);
+  g.fillStyle="#000";
+  g.beginPath();
+  g.arc(x,cy,9,0,Math.PI*2);
+  g.fill();
+}
+
+function drawMoonFace(cx,cy,sky,eclipse=0){
+  // Same face proportions as the Sun, with astronomical lunar illumination.
+  // Matches Cardputer v108bx exactly (R=10, 20px diameter).
+  eclipse=Math.max(0,Math.min(1,eclipse));
+  const R=10;
+  const face=mixHexColor("#f7d24a","#a53100",eclipse);
+  const ink=mixHexColor("#424121","#290000",eclipse);
+  const darkMoon=mixHexColor("#313131","#4a0000",eclipse);
+  const phase=lunarPhase01();
 
   g.save(); g.lineWidth=1;
   g.fillStyle=darkMoon;
@@ -1386,34 +1428,23 @@ function drawMoonFace(cx,cy,sky){
   g.strokeStyle=ink;
   g.beginPath(); g.arc(cx,cy,R,0,Math.PI*2); g.stroke();
 
-  g.beginPath();
-  g.moveTo(cx-7,cy-4); g.quadraticCurveTo(cx-4,cy-6,cx-1,cy-4);
-  g.moveTo(cx+1,cy-4); g.quadraticCurveTo(cx+4,cy-6,cx+7,cy-4);
-  g.stroke();
-  for(const s of [-1,1]){
-    const ex=cx+s*4;
-    g.beginPath();
-    g.moveTo(ex-2,cy-2); g.quadraticCurveTo(ex,cy-4,ex+2,cy-2);
-    g.quadraticCurveTo(ex,cy,ex-2,cy-2); g.stroke();
-    g.fillStyle=ink; g.fillRect(Math.round(ex),Math.round(cy-2),1,1);
-  }
+  // Brows + eyes + nose + lips + chin: matches Cardputer v108bx line-for-line.
+  const seg=(x1,y1,x2,y2)=>{ g.beginPath(); g.moveTo(cx+x1,cy+y1); g.lineTo(cx+x2,cy+y2); g.stroke(); };
+  const dot=(x,y)=>{ g.fillStyle=ink; g.fillRect(cx+x,cy+y,1,1); g.fillStyle=face; };
 
-  g.beginPath();
-  g.moveTo(cx,cy-1);
-  g.quadraticCurveTo(cx-1,cy+2,cx-1,cy+3);
-  g.quadraticCurveTo(cx,cy+4,cx+2,cy+3);
-  g.stroke();
+  seg(-6,-4,-4,-5); seg(-4,-5,-2,-4);
+  seg(2,-4,4,-5); seg(4,-5,6,-4);
+  seg(-6,-2,-4,-3); seg(-4,-3,-2,-2); dot(-4,-2);
+  seg(2,-2,4,-3); seg(4,-3,6,-2); dot(4,-2);
 
-  g.beginPath(); g.moveTo(cx,cy+4); g.lineTo(cx,cy+5); g.stroke();
-  g.beginPath();
-  g.moveTo(cx-3,cy+6);
-  g.quadraticCurveTo(cx-1,cy+5,cx,cy+6);
-  g.quadraticCurveTo(cx+1,cy+5,cx+3,cy+6);
-  g.stroke();
-  g.beginPath();
-  g.moveTo(cx-2,cy+7); g.quadraticCurveTo(cx,cy+8,cx+2,cy+7); g.stroke();
-  g.beginPath();
-  g.moveTo(cx-2,cy+9); g.quadraticCurveTo(cx,cy+10,cx+2,cy+9); g.stroke();
+  seg(0,-1,-1,2); seg(-1,2,0,3); seg(0,3,2,2);
+
+  dot(0,4);
+
+  seg(-2,5,0,4); seg(0,4,2,5);
+  seg(-2,6,0,7); seg(0,7,2,6);
+
+  seg(-1,8,1,8);
 
   g.restore();
 }
@@ -1422,11 +1453,41 @@ function moonXYForPhase(phase){
   // At moonrise the lunar disk is already visibly entering at the left edge;
   // at moonset it leaves at the right edge. Keep the low arc.
   phase=Math.max(0,Math.min(1,phase));
-  const R=11;
+  const R=10;
   const x=R + (SW-2*R)*phase;
-  const horizonY=112;
-  const ry=76;
+  const horizonY=62;
+  const ry=42;
   return {x, y:horizonY-ry*Math.sin(Math.PI*phase)};
+}
+
+function isMajorMeteorShowerDate(dateObj){
+  const mon=dateObj.getMonth()+1,day=dateObj.getDate();
+  return (mon===1  && day>=2  && day<=4 ) ||
+         (mon===4  && day>=21 && day<=23) ||
+         (mon===8  && day>=11 && day<=13) ||
+         (mon===10 && day>=20 && day<=22) ||
+         (mon===11 && day>=16 && day<=18) ||
+         (mon===12 && day>=12 && day<=14);
+}
+
+function drawMeteorShower(){
+  // Matches Cardputer v108bx exactly: no scaling needed at the real 240×135 resolution.
+  const beat=Math.floor(performance.now()/45)%61;
+  g.save();
+  g.strokeStyle="#ffff00";
+  g.lineWidth=1;
+  for(let i=0;i<4;i++){
+    const p=(beat+i*15)%61;
+    if(p<11){
+      const x=225-i*47-p*10;
+      const y=7+i*12+p*3;
+      g.beginPath();
+      g.moveTo(x+0.5,y+0.5);
+      g.lineTo(x+9+0.5,y-4+0.5);
+      g.stroke();
+    }
+  }
+  g.restore();
 }
 
 function skyColorForClock(c,w){
@@ -1484,20 +1545,26 @@ function drawSkyAndClock(){
   // Sun and Moon use independent real rise/set schedules.
   // CLOUDY does not delete them; foreground clouds can cover them naturally.
   const hide=(w.mode==="rain" || w.mode==="thunder");
+  const sp=intervalPhase(c.minute,ASTRO.sunrise,ASTRO.sunset);
+  const mp=intervalPhase(c.minute,ASTRO.moonrise,ASTRO.moonset);
+  const eclipse=eclipseVisualNow();
+  const solarEclipse=eclipse.solar && sp!==null && mp!==null;
   if(!hide){
-    const sp=intervalPhase(c.minute,ASTRO.sunrise,ASTRO.sunset);
-    if(sp!==null){
-      const p=celestialXYForPhase(sp);
-      drawSunFace(p.x,p.y);
-    }
-    const mp=intervalPhase(c.minute,ASTRO.moonrise,ASTRO.moonset);
-    if(mp!==null){
+    // Draw the ordinary Moon first and the Sun last. This prevents a normal
+    // new Moon from producing a false eclipse. A real syzygy/node event uses
+    // the dedicated black mask after the Sun has been drawn.
+    if(mp!==null && !solarEclipse){
       const p=moonXYForPhase(mp);
       const moonAlpha=moonVisibilityFromSun(c.minute);
       g.save();
       g.globalAlpha=moonAlpha;
-      drawMoonFace(p.x,p.y,sky);
+      drawMoonFace(p.x,p.y,sky,eclipse.lunarStrength);
       g.restore();
+    }
+    if(sp!==null){
+      const p=celestialXYForPhase(sp);
+      drawSunFace(p.x,p.y);
+      if(solarEclipse) drawSolarEclipseMask(p.x,p.y,eclipse);
     }
   }
 
@@ -1505,13 +1572,13 @@ function drawSkyAndClock(){
   // White stays dominant; sparse blue/red/yellow accents add a retro-game feel.
   // Only some stars twinkle, with staggered phases so they never blink in unison.
   if(!c.isDay){
+    // Matches Cardputer v108bx exactly: 19 fixed stars at the real 240×135 resolution.
     const stars=[
-      [8,14,"#ffffff",0],[24,33,"#ffffff",1],[41,18,"#4da6ff",0],[59,49,"#ffffff",0],
-      [78,10,"#ffd84d",0],[96,37,"#ffffff",1],[116,24,"#ffffff",0],[136,54,"#ff5a4d",0],
-      [157,15,"#ffffff",1],[177,41,"#ffffff",0],[198,28,"#4da6ff",0],[219,9,"#ffffff",0],
-      [242,46,"#ffd84d",1],[265,22,"#ffffff",0],[288,57,"#ffffff",0],[309,17,"#ff5a4d",0],
-      [33,67,"#ffffff",0],[89,61,"#4da6ff",1],[151,70,"#ffffff",0],[214,64,"#ffffff",0],
-      [277,72,"#ffd84d",0]
+      [8,11,"#ffffff",0],[21,28,"#ffffff",1],[37,18,"#5abeff",0],[52,44,"#ffffff",0],
+      [69,9,"#ffff00",0],[84,33,"#ffffff",1],[101,22,"#ffffff",0],[119,48,"#ff0000",0],
+      [137,13,"#ffffff",1],[154,37,"#ffffff",0],[173,25,"#5abeff",0],[191,7,"#ffffff",0],
+      [207,42,"#ffff00",1],[224,20,"#ffffff",0],[234,52,"#ffffff",0],[29,58,"#ff0000",0],
+      [77,55,"#ffffff",0],[146,61,"#5abeff",1],[216,57,"#ffffff",0]
     ];
     const tick=Math.floor(t/0.42);
     for(let i=0;i<stars.length;i++){
@@ -1527,6 +1594,13 @@ function drawSkyAndClock(){
       g.fillRect(sx,sy,1,1);
     }
     g.globalAlpha=1;
+
+    // Simplified annual meteor showers around six major peak dates. Yellow
+    // shooting stars appear only at night in clear or cloudy weather; clouds
+    // are drawn afterward and can naturally pass in front of them.
+    if(isMajorMeteorShowerDate(c.now) && (w.mode==="clear" || w.mode==="cloudy")){
+      drawMeteorShower();
+    }
   }
 
   let baseClouds=w.mode==="clear"?0:w.mode==="cloudy"?3:w.mode==="rain"?5:w.mode==="snow"?4:w.mode==="thunder"?6:1;
@@ -1542,22 +1616,22 @@ function drawSkyAndClock(){
     const spacing=span/Math.max(1,cloudCount);
     const phase=(t*speed + i*spacing + 80)%span;
     const x=SW+30-phase;
-    const y=100+(i%2)*17;
-    drawCloud(x,y,0.72+(i%3)*0.08,w.mode==="rain"||w.mode==="thunder");
+    const y=63+(i%2)*10;
+    drawCloud(x,y,w.mode==="rain"||w.mode==="thunder");
   }
 
   if(w.mode==="rain" || w.mode==="thunder"){
-    g.strokeStyle="#617f9f";
-    const precipBottom=216;
-    for(let i=0;i<34;i++){
+    g.strokeStyle="#5a8294";
+    const precipBottom=123;
+    for(let i=0;i<28;i++){
       const x=(i*9 + (t*22)%19)%SW;
       const y=((i*37 + t*45)%(precipBottom+16))-12;
       g.beginPath(); g.moveTo(x,y); g.lineTo(x+2,y+7); g.stroke();
     }
   }else if(w.mode==="snow"){
     g.fillStyle=c.isDay ? "#ffffff" : "#dce6f2";
-    const precipBottom=216;
-    for(let i=0;i<28;i++){
+    const precipBottom=123;
+    for(let i=0;i<24;i++){
       const x=(i*23 + (t*5)%(SW+20))%(SW+20)-10;
       const y=((i*31 + t*9)%(precipBottom+16))-12;
       g.fillRect(Math.round(x),Math.round(y),2,2);
@@ -1608,32 +1682,51 @@ function drawClockInfoOverlay(){
   if(showAuxInfo){
     g.font="bold 8px monospace";
     g.textAlign="left";
-    g.fillText(`SUN  R${fmtMinutes(ASTRO.sunrise)} S${fmtMinutes(ASTRO.sunset)}`,3,3);
-    g.fillText(`MOON R${fmtMinutes(ASTRO.moonrise)} S${fmtMinutes(ASTRO.moonset)}`,3,13);
+    g.fillText(`SUN  R${fmtMinutes(ASTRO.sunrise)} S${fmtMinutes(ASTRO.sunset)}`,2,2);
+    g.fillText(`MOON R${fmtMinutes(ASTRO.moonrise)} S${fmtMinutes(ASTRO.moonset)}`,2,12);
 
     const highText=TIDE.valid ? fmtTideEpoch(TIDE.nextHighEpoch) : "--:--";
     const lowText=TIDE.valid ? fmtTideEpoch(TIDE.nextLowEpoch) : "--:--";
-    const tideArrow=TIDE.valid ? (TIDE.rising ? "↑" : "↓") : "–";
     g.font="bold 7px monospace";
 
-    // Current Cardputer layout: H/L stacked below SUN/MOON.
-    g.fillText(`H${highText}`,43,23);
-    g.fillText(`L${lowText}`,43,33);
-    g.fillText(`TIDE${tideArrow}`,72,23);
+    // Matches Cardputer v108bx layout exactly: H/L stacked below SUN/MOON.
+    g.fillText(`H${highText}`,32,22);
+    g.fillText(`L${lowText}`,32,32);
+    g.fillText(`TIDE`,74,22);
+
+    // Small tide-direction arrow, matching the Cardputer ADV vector shape.
+    if(TIDE.valid){
+      g.save();
+      g.strokeStyle=ink;
+      g.lineWidth=1;
+      const ax=102;
+      g.beginPath();
+      if(TIDE.rising){
+        g.moveTo(ax,29); g.lineTo(ax,24);
+        g.moveTo(ax,24); g.lineTo(ax-2,26);
+        g.moveTo(ax,24); g.lineTo(ax+2,26);
+      }else{
+        g.moveTo(ax,24); g.lineTo(ax,29);
+        g.moveTo(ax,29); g.lineTo(ax-2,27);
+        g.moveTo(ax,29); g.lineTo(ax+2,27);
+      }
+      g.stroke();
+      g.restore();
+    }
 
     // Three thin blue tide waves, matching the Cardputer ADV visual cue.
     g.save();
     g.strokeStyle="#0078ff";
     g.lineWidth=1;
     for(let row=0;row<3;row++){
-      const baseY=24+row*4;
+      const baseY=23+row*3;
       g.beginPath();
       for(let wave=0;wave<3;wave++){
-        const x0=3+wave*12;
+        const x0=2+wave*9;
         g.moveTo(x0,baseY+2);
-        g.lineTo(x0+3,baseY);
-        g.lineTo(x0+6,baseY+2);
-        g.lineTo(x0+9,baseY);
+        g.lineTo(x0+2,baseY);
+        g.lineTo(x0+4,baseY+2);
+        g.lineTo(x0+6,baseY);
       }
       g.stroke();
     }
@@ -1645,10 +1738,11 @@ function drawClockInfoOverlay(){
     const auxRain=auxW.precipitationProbabilityPct===null ? "--" : String(auxW.precipitationProbabilityPct);
     const auxTemp=auxW.temperatureC===null ? "--.-" : auxW.temperatureC.toFixed(1);
     const auxHum=auxW.humidityPct===null ? "--" : String(auxW.humidityPct);
-    g.fillText(`TEMP ${auxTemp}C`,232,3);
-    g.fillText(`HUM  ${auxHum}%`,232,13);
-    g.fillText(`PRES ${auxPres}hPa`,232,23);
-    g.fillText(`RAIN ${auxRain}%`,232,33);
+    g.font="bold 8px monospace";
+    g.fillText(`TEMP ${auxTemp}C`,174,2);
+    g.fillText(`HUM  ${auxHum}%`,174,12);
+    g.fillText(`PRES ${auxPres}hPa`,174,22);
+    g.fillText(`RAIN ${auxRain}%`,174,32);
 
     // Browser cannot read the Cardputer ADV battery percentage.
     const eq=currentEqGeometry();
@@ -1673,18 +1767,19 @@ function drawClockInfoOverlay(){
 
     const retro=clockRetroPalette(c);
 
+    // Matches Cardputer v108bx layout exactly (clockX=W/2, y=39/53/80).
     g.textAlign="center";
-    g.font="bold 11px monospace";
+    g.font="bold 8px monospace";
     g.fillStyle=retro.date;
-    g.fillText(dateText,SW/2,62);
+    g.fillText(dateText,SW/2,39);
 
-    g.font="bold 34px monospace";
+    g.font="bold 20px monospace";
     g.fillStyle=retro.time;
-    g.fillText(timeText,SW/2,78);
+    g.fillText(timeText,SW/2,53);
 
     g.font="bold 8px monospace";
     g.fillStyle=retro.weather;
-    g.fillText(weatherLabel(),SW/2,116);
+    g.fillText(weatherLabel(),SW/2,80);
 
     g.fillStyle=ink;
   }
