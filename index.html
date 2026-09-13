@@ -71,6 +71,7 @@ dialog form{text-align:right}
 <tr><td><button class="keycap" type="button" data-control="j">J</button></td><td>Jump</td></tr>
 <tr><td><button class="keycap" type="button" data-control="w">W</button></td><td>Wave</td></tr>
 <tr><td><button class="keycap" type="button" data-control="u">U</button></td><td>UFO event</td></tr>
+<tr><td><button class="keycap" type="button" data-control="m">M</button></td><td>Meteor</td></tr>
 <tr><td><button class="keycap" type="button" data-control="t">T</button></td><td>Show / hide date, weekday, clock and weather</td></tr>
 <tr><td><button class="keycap" type="button" data-control="i">I</button></td><td>Show / hide detailed information and the 8-band EQ</td></tr>
 <tr class="hardware-only"><td><button class="keycap" type="button" data-control="c">C</button></td><td>Hold for 3 seconds to reset STEP <span class="hardware-tag">Cardputer ADV only</span></td></tr>
@@ -1409,27 +1410,81 @@ function serviceSundaySpecialStar(c,w){
 function drawSundaySpecialStar(){
   if(!specialStarTriggerMs) return;
   const elapsed=performance.now()-specialStarTriggerMs;
-  const DURATION_MS=11*45; // matches the visible p<11 streak range exactly
+  const DURATION_MS=900;
   if(elapsed>=DURATION_MS){
-    specialStarTriggerMs=0; // single pass finished; stays off until next Sunday
+    specialStarTriggerMs=0;
     return;
   }
-  const p=Math.floor(elapsed/45);
-  const x=225-p*10;
-  const y=7+p*3;
-  // A few quiet color steps along the same streak: white / pale cyan / white / pale yellow / white.
-  const colors=["#ffffff","#b5e7ef","#ffffff","#fffbbd","#ffffff"];
-  const colorPhase=Math.floor(p/2)%5;
+
+  const c=clockInfo();
+  const w=weatherInfo();
+  const sky=skyColorForClock(c,w);
+  const blackSky=(sky==="#050509" || sky==="rgb(5,5,9)");
+
+  // Special meteor:
+  // black sky -> warm yellow
+  // any brighter sky -> white
+  // Tail starts narrow, widens gently toward the rear, then fades smoothly.
+  const q=elapsed/DURATION_MS;
+  const hx=225-q*145;
+  const hy=9+q*44;
+
+  const dx=1.0, dy=-0.30;
+  const mag=Math.hypot(dx,dy);
+  const ux=dx/mag, uy=dy/mag;
+  const nx=-uy, ny=ux;
+
+  const tailLen=72;
+  const ex=hx+ux*tailLen;
+  const ey=hy+uy*tailLen;
+
+  const headHalf=0.42;
+  const rearHalf=1.85;
+
   g.save();
-  g.strokeStyle=colors[colorPhase];
-  g.lineWidth=1;
+
+  const grad=g.createLinearGradient(hx,hy,ex,ey);
+  if(blackSky){
+    grad.addColorStop(0.00,"rgba(255,246,180,0.98)");
+    grad.addColorStop(0.35,"rgba(255,230,122,0.90)");
+    grad.addColorStop(0.65,"rgba(246,201,79,0.72)");
+    grad.addColorStop(0.82,"rgba(221,160,48,0.46)");
+    grad.addColorStop(0.93,"rgba(190,124,34,0.20)");
+    grad.addColorStop(1.00,"rgba(160,96,24,0.02)");
+  }else{
+    grad.addColorStop(0.00,"rgba(255,255,255,0.98)");
+    grad.addColorStop(0.35,"rgba(255,255,255,0.90)");
+    grad.addColorStop(0.65,"rgba(245,245,245,0.72)");
+    grad.addColorStop(0.82,"rgba(225,225,225,0.46)");
+    grad.addColorStop(0.93,"rgba(205,205,205,0.20)");
+    grad.addColorStop(1.00,"rgba(185,185,185,0.02)");
+  }
+
+  g.fillStyle=grad;
   g.beginPath();
-  g.moveTo(x+0.5,y+0.5);
-  g.lineTo(x+9+0.5,y-4+0.5);
-  g.stroke();
+  g.moveTo(hx+nx*headHalf,hy+ny*headHalf);
+  g.lineTo(ex+nx*rearHalf,ey+ny*rearHalf);
+  g.lineTo(ex-nx*rearHalf,ey-ny*rearHalf);
+  g.lineTo(hx-nx*headHalf,hy-ny*headHalf);
+  g.closePath();
+  g.fill();
+
+  const x=Math.round(hx), y=Math.round(hy);
+
+  g.globalAlpha=0.72;
+  g.fillStyle=blackSky ? "#fff0a0" : "#ffffff";
+  g.fillRect(x-2,y,5,1);
+  g.fillRect(x,y-2,1,5);
+
+  g.globalAlpha=1;
+  g.fillStyle=blackSky ? "#ffd84d" : "#ffffff";
+  g.fillRect(x-1,y-1,3,3);
+
+  g.fillStyle="#ffffff";
+  g.fillRect(x,y,1,1);
+
   g.restore();
 }
-
 function skyColorForClock(c,w){
   const rgb=h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)];
   const mix=(a,b,t)=>{
@@ -1900,6 +1955,8 @@ function showHardwareOnly(message){
 }
 
 function runControl(k){
+  if(k==="m"){ specialStarTriggerMs=performance.now(); return; }
+
   if(k==="j"){
     const p=people[0];
     if(!UFO.active && p.state==="run"){
