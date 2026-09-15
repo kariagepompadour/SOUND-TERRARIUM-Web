@@ -150,44 +150,56 @@ function playSpecialStarSound(){
   const ac=effectAudioContext();
   if(!ac) return;
   const t0=ac.currentTime+0.01;
-  // Matches the Cardputer ADV v108ck fx==2 STAR_EV_* tables: 7 short
-  // decaying pings, each a different pitch and duration, with irregular
-  // gaps between them (0.135/0.118/0.154/0.109/0.146/0.127s). Deliberately
-  // NOT a repeating swept tone -- the earlier version's identical sweep
-  // played back-to-back read as a bird call rather than sparkle/twinkle.
-  const pings=[
-    // [delaySec, durSec, hz, peakGain]
-    [0.000,0.130,5200,0.046],
-    [0.135,0.110,7100,0.043],
-    [0.253,0.150,4400,0.050],
-    [0.407,0.100,6300,0.039],
-    [0.516,0.140,5000,0.046],
-    [0.662,0.120,6800,0.043],
-    [0.789,0.110,5900,0.044]
-  ];
-  for(const [delay,dur,hz,peak] of pings){
-    const start=t0+delay, end=start+dur;
-    const master=ac.createGain();
-    master.gain.setValueAtTime(0.0001,start);
-    master.gain.exponentialRampToValueAtTime(peak,start+0.004);
-    master.gain.exponentialRampToValueAtTime(0.0001,end);
-    master.connect(ac.destination);
 
-    const o1=ac.createOscillator();
-    o1.type="sine";
-    o1.frequency.value=hz;
-    o1.connect(master);
-
-    const o2=ac.createOscillator();
-    const g2=ac.createGain();
-    g2.gain.value=0.15;
-    o2.type="sine";
-    o2.frequency.value=Math.min(16000,hz*2);
-    o2.connect(g2); g2.connect(master);
-
-    o1.start(start); o2.start(start);
-    o1.stop(end+0.01); o2.stop(end+0.01);
+  // Re-synthesized from SOUND_TERRARIUM_shooting_star_v1.wav:
+  // 2.43 s total, strong ~2.1/5.6/8.4 kHz onset, then a dense quieter
+  // metallic shimmer concentrated around ~2.6-4.2 kHz with sparse high glints.
+  function tone(at,dur,hz,level,drift=1.0,type="sine"){
+    const o=ac.createOscillator();
+    const gain=ac.createGain();
+    o.type=type;
+    o.frequency.setValueAtTime(hz,at);
+    o.frequency.exponentialRampToValueAtTime(Math.max(80,hz*drift),at+dur);
+    gain.gain.setValueAtTime(0.0001,at);
+    gain.gain.exponentialRampToValueAtTime(level,at+Math.min(0.012,dur*0.12));
+    gain.gain.exponentialRampToValueAtTime(0.0001,at+dur);
+    o.connect(gain); gain.connect(ac.destination);
+    o.start(at); o.stop(at+dur+0.02);
   }
+
+  // Initial "KIRAAN": layered, bright and slightly staggered rather than a ping train.
+  tone(t0,     1.05,2092,0.034,1.13);
+  tone(t0,     0.82,5600,0.022,0.96);
+  tone(t0,     0.68,8400,0.016,0.93);
+  tone(t0+0.05,0.96,2350,0.020,1.10);
+  tone(t0+0.13,1.18,4200,0.024,0.99);
+
+  // Dense decaying "KIRA-KIRA" body. These overlap intentionally:
+  // the reference behaves like a shimmering cluster, not isolated identical notes.
+  const shimmer=[
+    [0.28,1.15,3975,0.010,1.03],
+    [0.34,1.05,2642,0.012,1.08],
+    [0.43,0.96,4725,0.008,0.98],
+    [0.57,1.12,3333,0.010,1.04],
+    [0.68,0.94,2650,0.010,1.07],
+    [0.78,0.90,4458,0.007,0.98],
+    [0.92,0.88,2808,0.009,1.06],
+    [1.02,0.82,3533,0.007,1.02],
+    [1.18,0.78,7475,0.005,0.95],
+    [1.28,0.72,2625,0.007,1.05],
+    [1.43,0.66,3167,0.006,1.03],
+    [1.58,0.60,7000,0.0045,0.96],
+    [1.72,0.52,2633,0.0055,1.03],
+    [1.88,0.42,7475,0.0035,0.96]
+  ];
+  for(const [delay,dur,hz,level,drift] of shimmer){
+    tone(t0+delay,dur,hz,level,drift);
+  }
+
+  // Very soft lower octave traces heard late in the reference help the tail
+  // feel like a fading bell rather than a collection of notification beeps.
+  tone(t0+1.30,0.90,1400,0.0035,0.98);
+  tone(t0+1.62,0.68,1317,0.0028,1.00);
 }
 
 function startUfoBeamSound(){
@@ -245,7 +257,7 @@ function updateUfoBeamSound(){
   s.master.gain.setTargetAtTime(0.010*trem,now,0.018);
 }
 
-// Low retro UFO flight sound: the approved "wo-wo-wo" character.
+// Space-Invaders-inspired UFO flight sound: approved fast SN76477-style warble.
 // Used while the saucer is entering or leaving, but not while hovering/beam is active.
 function startUfoFlightSound(){
   if(ufoFlightSfx || !soundEffectsEnabled) return;
@@ -257,20 +269,13 @@ function startUfoFlightSound(){
   master.gain.exponentialRampToValueAtTime(0.020,ac.currentTime+0.025);
   master.connect(ac.destination);
 
+  // A square/pulse carrier gives the hard late-70s arcade VCO character.
   const main=ac.createOscillator();
-  main.type="sine";
-  const h2=ac.createOscillator();
-  h2.type="sine";
-  const h3=ac.createOscillator();
-  h3.type="sine";
-  const g2=ac.createGain(), g3=ac.createGain();
-  g2.gain.value=0.20; g3.gain.value=0.12;
+  main.type="square";
   main.connect(master);
-  h2.connect(g2); g2.connect(master);
-  h3.connect(g3); g3.connect(master);
-  main.start(); h2.start(); h3.start();
+  main.start();
 
-  ufoFlightSfx={ac,main,h2,h3,master,startMs:performance.now()};
+  ufoFlightSfx={ac,main,master,startMs:performance.now()};
 }
 
 function stopUfoFlightSound(){
@@ -281,9 +286,7 @@ function stopUfoFlightSound(){
   s.master.gain.cancelScheduledValues(now);
   s.master.gain.setValueAtTime(Math.max(0.0001,s.master.gain.value),now);
   s.master.gain.exponentialRampToValueAtTime(0.0001,now+0.045);
-  try{
-    s.main.stop(now+0.055); s.h2.stop(now+0.055); s.h3.stop(now+0.055);
-  }catch(_){}
+  try{s.main.stop(now+0.055);}catch(_){}
 }
 
 function updateUfoFlightSound(){
@@ -295,16 +298,16 @@ function updateUfoFlightSound(){
   if(!s) return;
 
   const t=(performance.now()-s.startMs)/1000;
-  // Rounded low two-pitch wobble, about four pulses per second.
-  const mod=Math.tanh(2.8*Math.sin(2*Math.PI*4.0*t));
-  const f=360+85*mod;
-  const pulse=0.60+0.40*(0.5+0.5*Math.sin(2*Math.PI*4.0*t+0.7));
+  // Approved v4 character: fast ~5.25 Hz triangle-like SLF sweep driving the VCO.
+  const q=(t*5.25)%1;
+  const tri=1-Math.abs(2*q-1);
+  const ctrl=Math.pow(tri,1.18);
+  const f=640+760*ctrl;
   const now=s.ac.currentTime;
-  s.main.frequency.setTargetAtTime(f,now,0.010);
-  s.h2.frequency.setTargetAtTime(f*2,now,0.010);
-  s.h3.frequency.setTargetAtTime(f*3,now,0.010);
-  s.master.gain.setTargetAtTime(0.020*pulse,now,0.015);
+  s.main.frequency.setTargetAtTime(f,now,0.003);
+  s.master.gain.setTargetAtTime(0.020,now,0.010);
 }
+
 
 // Very quiet 8-bit manual-jump chirp.
 // Intentionally only for J/manual jump; automatic terrain jumps stay silent.
@@ -396,6 +399,86 @@ function playAbductVoice(){
 
 let demoMode=true, tick=0, last=0;
 let terrainAccumulator=0;
+
+// ---------------- Ground perspective dots: terrain-speed-matched experiment ----------------
+// updateTerrain() shifts the terrain exactly 1 px left per rendered frame.
+// Therefore FAR dots use the same 1 px/frame base motion; MIDDLE and NEAR
+// move progressively faster to preserve a monotonic perspective cue.
+const groundDots=[];
+
+function resetGroundDot(d,fromRight=false){
+  if(d.tier===0){
+    d.y=101+Math.random()*8;
+    d.step=1.0;               // same speed as terrain
+    d.size=1;
+  }else if(d.tier===1){
+    d.y=110+Math.random()*10;
+    d.step=1.7;               // faster than terrain
+    d.size=2;
+  }else{
+    d.y=122+Math.random()*12;
+    d.step=2.7;               // clearly faster than terrain
+    d.size=3;
+  }
+  d.x=fromRight ? SW+Math.random()*24 : Math.random()*SW;
+}
+
+// Restrained density: FAR 6 / MIDDLE 5 / NEAR 3 = 14 total.
+function makeGroundDotForTier(tier){
+  const d={tier};
+  if(tier===0){
+    d.y=101+Math.random()*8;
+    d.step=1.0;
+    d.size=1;
+  }else if(tier===1){
+    d.y=110+Math.random()*10;
+    d.step=1.7;
+    d.size=2;
+  }else{
+    d.y=122+Math.random()*12;
+    d.step=2.7;
+    d.size=3;
+  }
+  d.x=Math.random()*SW;
+  return d;
+}
+for(let i=0;i<6;i++) groundDots.push(makeGroundDotForTier(0));
+for(let i=0;i<5;i++) groundDots.push(makeGroundDotForTier(1));
+for(let i=0;i<3;i++) groundDots.push(makeGroundDotForTier(2));
+
+function updateGroundDots(){
+  for(const d of groundDots){
+    d.x-=d.step;
+    if(d.x < -d.size) resetGroundDot(d,true);
+  }
+}
+
+function drawGroundPerspectiveDots(){
+  // Day: black. Night: dark navy, visible on blue without looking luminous.
+  g.fillStyle=clockInfo().isDay ? "#000" : "#000066";
+  for(const d of groundDots){
+    const x=Math.max(0,Math.min(SW-1,Math.round(d.x)));
+    const surfaceY=groundAt(0,x);
+    const groundDepth=SH-surfaceY;
+    if(groundDepth<=0) continue;
+
+    const depthRatio=(d.y-surfaceY)/groundDepth;
+    // Empty band immediately below the terrain surface/horizon.
+    const minDepth=(d.tier===0 ? 0.26 : d.tier===1 ? 0.43 : 0.62);
+    if(depthRatio<minDepth || d.y>=SH) continue;
+
+    const px=Math.round(d.x), py=Math.round(d.y);
+    if(d.size===1){
+      g.fillRect(px,py,1,1);
+    }else if(d.size===2){
+      g.fillRect(px,py,2,2);
+    }else{
+      // NEAR: true 3x3 grain so the three perspective sizes read clearly.
+      g.fillRect(px,py,3,3);
+    }
+  }
+}
+
 
 const histories=[new Array(SW+24).fill(108)];
 const bands=[0], smooth=[0], prevBands=[0], beatPulse=[0], bandCooldown=[0];
@@ -2120,6 +2203,8 @@ function draw(){
   g.fill();
   g.restore();
 
+  drawGroundPerspectiveDots();
+
   // 1 px road edge uses the same black/white contrast rule as the clock.
   g.strokeStyle=roadInk;
   g.lineWidth=1;
@@ -2178,6 +2263,7 @@ function loop(t){
     analyzeAudio(t);
     updateAdaptiveEqNorm();
     updateTerrain();
+    updateGroundDots();
     beatAdvance();
     updateUfo();
     updateUfoFlightSound();

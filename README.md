@@ -7,14 +7,29 @@ No M5Stack hardware required.
 💻 **On desktop Chrome**, you can share tab audio to make the world react directly to music and other browser audio.
 
 
+## 🌱 Ground Perspective
+
+The terrain now has a subtle sense of depth without changing the
+sound-generated landscape itself.
+
+Fourteen sparse ground grains are divided into three depth layers:
+
+- **6 small grains** — 1 × 1 px, moving with the terrain
+- **5 medium grains** — 2 × 2 px, moving at about 1.7× terrain speed
+- **3 large grains** — 3 × 3 px, moving at about 2.7× terrain speed
+
+A clear band immediately below the surface keeps the distant horizon
+uncluttered. The grains are **black by day** and **dark navy by night**, so
+they read as texture and parallax rather than stars or glowing particles.
+
 ## 🔊 Event Sound Effects
 
 The Web Edition now includes small retro-style event sound effects
 generated with Web Audio. No prerecorded audio files are required.
 
 - **J** — manual jump: a very quiet 8-bit chirp
-- **M** / Sunday 9 PM shooting star — sparkling trail sound
-- **UFO flight** — low retro pulse
+- **M** / Sunday 9 PM shooting star — a bright synthetic **"KIRAAN"** followed by a quieter sparkling tail
+- **UFO flight** — fast retro square-wave sweep inspired by late-1970s arcade flying-saucer sounds
 - **UFO beam** — very quiet rising electronic sound
 - **Runner abduction** — a short synthetic "Aaa!" as the runner is lifted
 
@@ -27,7 +42,7 @@ activates the browser audio context.
 
 ## 🌠 Sunday 9 PM Shooting Star
 
-Every Sunday at 9 PM local time, a special shooting star crosses the SOUND TERRARIUM sky. When SFX is enabled and browser audio has been activated, a small sparkling sound follows the star.
+Every Sunday at 9 PM local time, a special shooting star crosses the SOUND TERRARIUM sky. When SFX is enabled and browser audio has been activated, a bright synthetic "KIRAAN" is followed by a quieter sparkling tail lasting about 2.43 seconds.
 
 It is a small moment at the end of the week — a time to look back on the week that has passed and make a wish for the week ahead.
 
@@ -48,7 +63,8 @@ Existing **major meteor-shower events are unchanged** and remain separate from t
 https://kariagepompadour.github.io/SOUND-TERRARIUM-Web/
 
 ---
-*v13.1: the shooting-star sound's synthesis was reworked (now several
-short, irregularly-spaced sparkle sounds instead of a repeating sweep),
-matching a Cardputer ADV audio fix. Nothing else in this document
-changed.*
+*Current update: added restrained three-layer ground perspective grains,
+refined the shooting-star synthesis into a longer **"KIRAAN" → quieter
+sparkle** effect, and updated the UFO flight sound with a faster retro
+square-wave sweep. Existing major meteor-shower events and other controls are
+unchanged.*
