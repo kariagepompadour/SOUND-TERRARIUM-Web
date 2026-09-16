@@ -1,4 +1,4 @@
-<!-- SOUND TERRARIUM HTML SFX v13.1: shooting-star SFX reworked to match Cardputer
+<!-- SOUND TERRARIUM Web v138: retires the unreliable battery placeholder and adds the built-in metronome matching Cardputer ADV v108cr.\n  SOUND TERRARIUM HTML SFX v13.1: shooting-star SFX reworked to match Cardputer
   ADV v108ck's 7 irregular decaying pings (STAR_EV_* tables), replacing the
   earlier repeated descending sweep. No other SFX or visual behavior changed.
   v13: X toggles SFX ON/OFF; adds shooting-star, UFO flight/beam, abduct voice, and subtle manual-jump sounds (no audio files).
@@ -77,6 +77,11 @@ dialog form{text-align:right}
 <tr><td><button class="keycap" type="button" data-control="u">U</button></td><td>UFO event</td></tr>
 <tr><td><button class="keycap" type="button" data-control="m">M</button></td><td>Meteor</td></tr>
 <tr><td><button class="keycap" type="button" data-control="x">X</button></td><td><span id="sfxState">SFX ON</span></td></tr>
+<tr><td><button class="keycap" type="button" data-control="b">B</button></td><td>Metronome ON / OFF</td></tr>
+<tr><td><button class="keycap" type="button" data-control="arrowleft">←</button></td><td>−1 BPM <span class="web-only-tag">(hold to repeat)</span></td></tr>
+<tr><td><button class="keycap" type="button" data-control="arrowright">→</button></td><td>+1 BPM <span class="web-only-tag">(hold to repeat)</span></td></tr>
+<tr><td><button class="keycap" type="button" data-control="arrowdown">↓</button></td><td>Metronome volume −10</td></tr>
+<tr><td><button class="keycap" type="button" data-control="arrowup">↑</button></td><td>Metronome volume +10</td></tr>
 <tr><td><button class="keycap" type="button" data-control="t">T</button></td><td>Show / hide date, weekday, clock and weather</td></tr>
 <tr><td><button class="keycap" type="button" data-control="i">I</button></td><td>Show / hide detailed information and the 8-band EQ</td></tr>
 <tr class="hardware-only"><td><button class="keycap" type="button" data-control="c">C</button></td><td>Hold for 3 seconds to reset STEP <span class="hardware-tag">Cardputer ADV only</span></td></tr>
@@ -87,7 +92,7 @@ dialog form{text-align:right}
 Sound from the built-in microphone continuously shapes the terrain. Tilting the device left or right also tilts the terrain.<br>
 Device tilt control is available only on the Cardputer ADV version.</p>
 </div>
-<div class="note">Press START MICROPHONE and allow microphone access in your browser. The EQ continues to drive the terrain even while hidden. The browser shows STEP xxxx as a placeholder, AP: BROWSER because browsers cannot read the connected Wi-Fi name, and BAT OK because the Cardputer battery percentage is unavailable. On Cardputer ADV, the AP field displays the connected Wi-Fi access point name.</div>
+<div class="note">Press START MICROPHONE and allow microphone access in your browser. The EQ continues to drive the terrain even while hidden. The browser shows STEP xxxx as a placeholder and AP: BROWSER because browsers cannot read the connected Wi-Fi name. The old battery placeholder has been retired. Press B to start the metronome; while it is active, use ←/→ for BPM and ↓/↑ for volume.</div>
 
 <dialog id="hardwareOnlyDialog">
 <h3>Cardputer ADV only</h3>
@@ -128,6 +133,91 @@ let audioCtx=null, analyser=null, freq=null, sharedStream=null;
 let soundEffectsEnabled=true;
 let ufoBeamSfx=null;
 let ufoFlightSfx=null;
+
+let metronomeEnabled=false;
+let metronomeBpm=120;
+let metronomeVolume=80;
+let metronomeTimer=null;
+let metronomeVolumeDisplayUntil=0;
+let metronomeOwnsAnalyser=false;
+const METRONOME_BPM_MIN=40, METRONOME_BPM_MAX=200;
+const METRONOME_VOL_MIN=20, METRONOME_VOL_MAX=100;
+
+function ensureMetronomeAudio(){
+  try{
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended") audioCtx.resume().catch(()=>{});
+    // If the microphone has not been started, create an analyser fed directly
+    // by the generated click so the metronome itself can shape the terrain.
+    if(!analyser){
+      analyser=audioCtx.createAnalyser();
+      analyser.fftSize=4096;
+      analyser.smoothingTimeConstant=0.68;
+      freq=new Uint8Array(analyser.frequencyBinCount);
+      demoMode=false;
+      metronomeOwnsAnalyser=true;
+      const meter=document.getElementById("m");
+      if(meter) meter.textContent="audio: metronome";
+    }
+    return audioCtx;
+  }catch(_){ return null; }
+}
+
+function playMetronomeClick(){
+  if(!metronomeEnabled) return;
+  const ac=ensureMetronomeAudio();
+  if(!ac) return;
+  const t0=ac.currentTime+0.002, dur=0.055;
+  const o=ac.createOscillator(), gain=ac.createGain();
+  o.type="square";
+  o.frequency.setValueAtTime(1050,t0);
+  o.frequency.exponentialRampToValueAtTime(720,t0+dur);
+  const level=0.18*(metronomeVolume/100);
+  gain.gain.setValueAtTime(0.0001,t0);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0002,level),t0+0.003);
+  gain.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(gain);
+  gain.connect(ac.destination);
+  if(analyser) gain.connect(analyser);
+  o.start(t0); o.stop(t0+dur+0.01);
+}
+
+function scheduleMetronome(){
+  if(metronomeTimer!==null){ clearTimeout(metronomeTimer); metronomeTimer=null; }
+  if(!metronomeEnabled) return;
+  playMetronomeClick();
+  metronomeTimer=setTimeout(scheduleMetronome,60000/metronomeBpm);
+}
+
+function setMetronomeEnabled(on){
+  metronomeEnabled=!!on;
+  if(metronomeTimer!==null){ clearTimeout(metronomeTimer); metronomeTimer=null; }
+  if(metronomeEnabled){
+    scheduleMetronome();
+  }else if(metronomeOwnsAnalyser){
+    analyser=null; freq=null; demoMode=true; metronomeOwnsAnalyser=false;
+    const meter=document.getElementById("m");
+    if(meter) meter.textContent="audio: demo";
+  }
+}
+
+function adjustMetronomeBpm(delta){
+  if(!metronomeEnabled) return;
+  const next=Math.max(METRONOME_BPM_MIN,Math.min(METRONOME_BPM_MAX,metronomeBpm+delta));
+  if(next===metronomeBpm) return;
+  metronomeBpm=next;
+  // Do not restart the beat here. Keyboard auto-repeat can arrive much faster
+  // than the metronome period; restarting would turn a long hold into a burst
+  // of clicks. The running scheduler picks up the new BPM on its next cycle.
+}
+
+function adjustMetronomeVolume(delta){
+  if(!metronomeEnabled) return;
+  const next=Math.max(METRONOME_VOL_MIN,Math.min(METRONOME_VOL_MAX,metronomeVolume+delta));
+  if(next===metronomeVolume) return;
+  metronomeVolume=next;
+  metronomeVolumeDisplayUntil=performance.now()+1400;
+}
 
 function updateSfxStateLabel(){
   const el=document.getElementById("sfxState");
@@ -2033,7 +2123,7 @@ function clockRetroPalette(c){
 }
 
 function drawClockInfoOverlay(){
-  if(!showClockInfo && !showAuxInfo) return;
+  if(!showClockInfo && !showAuxInfo && !metronomeEnabled) return;
 
   // T and I are deliberately independent:
   // T = date/weekday/time/weather only. I = detailed information + visible EQ.
@@ -2110,12 +2200,8 @@ function drawClockInfoOverlay(){
     g.fillText(`PRES ${auxPres}hPa`,174,22);
     g.fillText(`RAIN ${auxRain}%`,174,32);
 
-    // Browser cannot read the Cardputer ADV battery percentage.
-    // SFX status is shown beside BAT only while the I information overlay is visible.
-    const eq=currentEqGeometry();
+    // Battery status was retired; SFX remains part of the I overlay.
     g.font="bold 6px monospace";
-    g.textAlign="left";
-    g.fillText("BAT OK",eq.x0,SH-10);
     g.textAlign="right";
     g.fillText(soundEffectsEnabled ? "SFX ON" : "SFX OFF",SW-3,SH-10);
     g.textAlign="left";
@@ -2128,6 +2214,36 @@ function drawClockInfoOverlay(){
     g.fillText("STEP xxxx",3,SH-30);
     g.fillText("AP: BROWSER",3,SH-20);
     g.fillText(locText,3,SH-10);
+  }
+
+  // Fixed metronome status: independent of I and absent while B is OFF.
+  // Anchored immediately to the left of the SFX ON/OFF label, on the same
+  // bottom row the Cardputer ADV firmware uses for its BPM/VOL readout
+  // (see the bottom_right anchor next to "sx" in drawStatusRow() in the
+  // .ino). The SFX label width is measured regardless of showAuxInfo, so
+  // this anchor never shifts when I is toggled. Vertically it stays at
+  // SH-10, which is always below eq.horizonY, so it can never overlap the
+  // EQ bars (they never draw past the horizon) regardless of bar height.
+  if(metronomeEnabled){
+    const showVol=performance.now()<metronomeVolumeDisplayUntil;
+    const value=showVol ? String(metronomeVolume) : String(metronomeBpm);
+    const suffix=showVol ? "% VOL" : "BPM";
+
+    g.textBaseline="top";
+    g.font="bold 6px monospace";
+    const sfxLabel=soundEffectsEnabled ? "SFX ON" : "SFX OFF";
+    const sfxLabelWidth=g.measureText(sfxLabel).width;
+    const suffixWidth=g.measureText(suffix).width;
+    const y=SH-10;
+    const suffixRight=(SW-3)-sfxLabelWidth-4;
+    const valueRight=suffixRight-suffixWidth-2;
+
+    g.fillStyle=ink;
+    g.textAlign="right";
+    g.font="bold 10px monospace";
+    g.fillText(value,valueRight,y);
+    g.font="bold 6px monospace";
+    g.fillText(suffix,suffixRight,y);
   }
 
   if(showClockInfo){
@@ -2301,6 +2417,7 @@ document.getElementById("share").addEventListener("click",async()=>{
     const stream=new MediaStream(tracks);
     const src=audioCtx.createMediaStreamSource(stream);
     analyser=audioCtx.createAnalyser();
+    metronomeOwnsAnalyser=false;
     analyser.fftSize=4096;
     analyser.smoothingTimeConstant=0.68;
     src.connect(analyser);
@@ -2332,6 +2449,12 @@ function showHardwareOnly(message){
 }
 
 function runControl(k){
+  if(k==="b"){ setMetronomeEnabled(!metronomeEnabled); return; }
+  if(k==="arrowleft"){ adjustMetronomeBpm(-1); return; }
+  if(k==="arrowright"){ adjustMetronomeBpm(+1); return; }
+  if(k==="arrowdown"){ adjustMetronomeVolume(-10); return; }
+  if(k==="arrowup"){ adjustMetronomeVolume(+10); return; }
+
   if(k==="m"){
     specialStarTriggerMs=performance.now();
     playSpecialStarSound();
@@ -2374,10 +2497,12 @@ document.querySelectorAll("[data-control]").forEach(button=>{
 });
 
 window.addEventListener("keydown",(ev)=>{
-  if(ev.repeat) return;
   if(ev.ctrlKey||ev.metaKey||ev.altKey) return;
   if(ev.target instanceof HTMLInputElement || ev.target instanceof HTMLTextAreaElement || ev.target instanceof HTMLSelectElement) return;
-  runControl(ev.key.toLowerCase());
+  const k=ev.key.toLowerCase();
+  if(ev.repeat && k!=="arrowleft" && k!=="arrowright") return;
+  if(["arrowleft","arrowright","arrowup","arrowdown"].includes(k)) ev.preventDefault();
+  runControl(k);
 });
 
 
